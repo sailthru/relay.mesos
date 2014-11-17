@@ -1,0 +1,6 @@
+*.egg-info/
+*pyc
+.ropeproject
+build/
+dist/
+node_modules/
