@@ -7,25 +7,26 @@ except ImportError:
     raise
 
 setup(
-    name='relay.marathon',
+    name='relay_mesos',
     version='0.0.1',
     description=(
-        'Run an arbitrary bash command as a mesos framework.'
-        ' Scale up number of concurrently running instances based on a metric.'
+        'A plugin to Relay that lets you'
+        ' run an arbitrary bash command as a mesos framework.'
+        ' Scale number of concurrently running instances based on a metric.'
         ' Generally good for auto-scaling workers.  Similar to Marathon,'
         ' but designed for applications that fail often or need to be'
-        " autoscaled using relay's algorithm"
+        " autoscaled using Relay's algorithm"
     ),
     long_description="Check the project homepage for details",
     keywords=['mesos', 'marathon', 'relay', 'framework'],
 
     author='Alex Gaudio',
     author_email='adgaudio@gmail.com',
-    url='http://github.com/sailthru/relay.marathon',
+    url='http://github.com/sailthru/relay.mesos',
 
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['argparse_tools', 'colorlog'],
+    install_requires=['relay'],
 
     extras_require={
         'webui': ['pyzmq'],
@@ -36,10 +37,10 @@ setup(
 
     entry_points = {
         'console_scripts': [
-            'relay = relay.__main__:go',
+            'relay_mesos = relay_mesos.__main__:go',
         ],
         'setuptools.installation': [
-            'eggsecutable = relay.__main__:go',
+            'eggsecutable = relay_mesos.__main__:go',
         ],
     },
 )
