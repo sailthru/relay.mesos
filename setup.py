@@ -7,18 +7,22 @@ except ImportError:
     raise
 
 setup(
-    name='relay_mesos',
+    name='relay.mesos',
     version='0.0.1',
     description=(
-        'A plugin to Relay that lets you'
-        ' run an arbitrary bash command as a mesos framework.'
-        ' Scale number of concurrently running instances based on a metric.'
+        'A plugin for Relay that lets you run Relay on Mesos to'
+        ' auto-scale the number of concurrently running instances'
+        ' of a bash command to minimize the difference between a'
+        ' metric and a target timeseries.'
         ' Generally good for auto-scaling workers.  Similar to Marathon,'
         ' but designed for applications that fail often or need to be'
-        " autoscaled using Relay's algorithm"
+        " auto-scaled using Relay's algorithm"
     ),
     long_description="Check the project homepage for details",
-    keywords=['mesos', 'marathon', 'relay', 'framework'],
+    keywords=[
+        'mesos', 'marathon', 'relay', 'framework',
+        'relay', 'pid', 'pid controller', 'thermostat', 'tuning',
+        'oscilloscope', 'auto-scale'],
 
     author='Alex Gaudio',
     author_email='adgaudio@gmail.com',
@@ -26,11 +30,10 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['relay'],
+    install_requires=['relay', 'mesos.cli', 'mesos.interface'],
 
     extras_require={
-        'webui': ['pyzmq'],
-        'mesos': ['mesos.native', 'mesos.cli', 'mesos.interface'],
+        'mesos': ['mesos.native'],
     },
     tests_require=['nose'],
     test_suite="nose.main",
