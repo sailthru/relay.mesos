@@ -19,3 +19,13 @@ def warmer(n):
 def cooler(n):
     """Kill n tasks"""
     raise NotImplementedError()
+
+
+def metric():
+    while True:
+        yield 0
+
+
+def target():
+    while True:
+        yield 0

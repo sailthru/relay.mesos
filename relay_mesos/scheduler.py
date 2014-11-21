@@ -96,6 +96,13 @@ class Scheduler(mesos.interface.Scheduler):
         """
         log.debug("Got resource offers", extra=dict(num_offers=len(offers)))
         if True:  # TODO: get metric data vs num running tasks
+            # two things can happen:
+            # 1. Mesos is free and can't be filled by enough relay requests
+            #  --> yay!
+            # 2. Mesos is full and relay requests can't be fulfilled
+            #  --> relay will get confused so we should modify the target
+            # to "disable" relay via:
+            #      next(metric) == next(target)
             return
 
         for offer in offers:
