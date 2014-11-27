@@ -30,7 +30,8 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['relay.runner', 'mesos.cli', 'mesos.interface'],
+    install_requires=[
+        'relay.runner', 'mesos.cli', 'mesos.interface', 'greenlet'],
 
     extras_require={
         'mesos': ['mesos.native'],
