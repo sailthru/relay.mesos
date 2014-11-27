@@ -30,7 +30,7 @@ setup(
 
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['relay', 'mesos.cli', 'mesos.interface'],
+    install_requires=['relay.runner', 'mesos.cli', 'mesos.interface'],
 
     extras_require={
         'mesos': ['mesos.native'],
@@ -40,7 +40,7 @@ setup(
 
     entry_points = {
         'console_scripts': [
-            'relay_mesos = relay_mesos.__main__:go',
+            'relay.mesos = relay_mesos.__main__:go',
         ],
         'setuptools.installation': [
             'eggsecutable = relay_mesos.__main__:go',
