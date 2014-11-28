@@ -20,7 +20,7 @@ def wc_wrapper_factory(f):
         # TODO n_mesos_offers is not necessary at the moment
 
         # switch called from Relay
-        getcurrent().parent.switch(n, f)
+        getcurrent().parent.switch()
         n_fulfilled = getcurrent().parent.switch(n, f)
         return n_fulfilled
 
@@ -54,13 +54,10 @@ def init_mesos_scheduler(relayloop):
     # period of time.
     log.info('Initializing Mesos Scheduler')
     getcurrent().parent.switch()  # return context to main
-    n = 0  # debug
 
     while True:  # assume this func is the resourceOffers that come in
-        n+=1  # debug
         import random
-
-        navailable = int(random.choice([0]*2+ [3] * 3 + [10]))
+        navailable = int(random.choice([0]*2 + [3] * 3 + [10]))
         # navailable = 15  # lets say I figured this out in resourceOffers
 
         # wait on anything to use these available offers
@@ -70,9 +67,6 @@ def init_mesos_scheduler(relayloop):
             extra=dict(available_offers=navailable))
 
         nrequests, func = relayloop.switch()
-        if n % 1000 > 500:
-            print 'skip'
-            continue
         if func and navailable > 0:
             n = min(navailable, nrequests)
             func(n)
@@ -80,14 +74,13 @@ def init_mesos_scheduler(relayloop):
         else:
             relayloop.switch(None)
 
-
         log.warn(
             'Relay requested some offers', extra=dict(
                 requested_offers=nrequests, func=func and func.func_name))
         # if nrequests == 0:
-            # decline offers
+        #     driver.declineOffer(offer.id)
         # else:
-            # accept nrequests offers and start tasks
+        #     accept nrequests offers and start tasks
 
 
 build_arg_parser = at.build_arg_parser([
