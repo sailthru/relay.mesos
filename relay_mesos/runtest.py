@@ -3,9 +3,7 @@ import os
 from mesos.interface import mesos_pb2
 import mesos.native
 
-from relay.scheduler import Scheduler
-from relay.relay_logging import configure_logging
-configure_logging('relay.runtest')
+from relay_mesos.scheduler import Scheduler
 
 
 if __name__ == '__main__':
@@ -15,7 +13,7 @@ if __name__ == '__main__':
 
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = "default"
-    executor.command.value = "python -m relay.executor"
+    executor.command.value = "python -m relay_mesos.executor"
     executor.name = "Relay executor"
     executor.source = "relay_test"
 
