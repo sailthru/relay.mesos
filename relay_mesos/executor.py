@@ -22,7 +22,7 @@ class RelayMesosExecutor(mesos.interface.Executor):
         self.cmd = (
             "sleep %s "
             " ; sh -c 'echo from bash: started relay launcher task && sleep %s'"
-        ) % (1 + random.random()*2, 3*random.random() + 3)
+        ) % (1 + random.random()*2, 3*random.random() + 0)
         # TODO: consider supporting pickled functions
 
     def launchTask(self, driver, task):
