@@ -9,10 +9,20 @@ import mesos.interface
 from mesos.interface import mesos_pb2
 import mesos.native
 
+from relay_mesos import log
+
 
 class RelayMesosExecutor(mesos.interface.Executor):
-    def __init__(self, cmd='echo TODO'):  # TODO: remove ='echo TODO'
+    def __init__(self, cmd='echo TODO;sleep 5'):  # TODO: remove ='echo TODO'
         self.cmd = cmd  # the bash command that is a warmer or cooler
+
+        import random
+        import time
+        random.seed(time.time())
+        self.cmd = (
+            "sleep %s "
+            " ; sh -c 'echo from bash: started relay launcher task && sleep %s'"
+        ) % (1 + random.random()*2, 3*random.random() + 3)
         # TODO: consider supporting pickled functions
 
     def launchTask(self, driver, task):
@@ -27,7 +37,8 @@ class RelayMesosExecutor(mesos.interface.Executor):
             driver.sendStatusUpdate(update)
 
             # This is where one would perform the requested task.
-            retcode = subprocess.call(self.cmd, shell=True)
+            log.info("Running command in executor", extra=dict(cmd=self.cmd))
+            retcode = subprocess.call(self.cmd, shell=True, executable='bash')
 
             update = mesos_pb2.TaskStatus()
             update.task_id.value = task.task_id.value

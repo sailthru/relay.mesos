@@ -2,13 +2,19 @@
 Bootstrap the execution of Relay but first do the things necessary to setup
 Relay as a Mesos Framework
 """
-from greenlet import greenlet, getcurrent
+import atexit
+import os
+import sys
+import threading
+import zmq
+
 from relay import argparse_shared as at
 from relay.runner import main as relay_main, build_arg_parser as relay_ap
 from relay_mesos import log
+from relay_mesos.scheduler import Scheduler
 
 
-def wc_wrapper_factory(f):
+def wc_wrapper_factory(f, mesos_channel):
     """
     Wrap a warmer or cooler function such that, just before executing it, we
     wait for mesos offers to ensure that the tasks can be created.
@@ -16,12 +22,11 @@ def wc_wrapper_factory(f):
     def warmer_cooler_wrapper(n):
         # inform mesos that it should spin up n tasks of type f, where f is
         # either the warmer or cooler.
-        # mutable['n_mesos_offers'] = mesosloop.switch(n, f)
-        # TODO n_mesos_offers is not necessary at the moment
-
-        # switch called from Relay
-        getcurrent().parent.switch()
-        n_fulfilled = getcurrent().parent.switch(n, f)
+        # TODO n_fulfilled is not necessary at the moment
+        log.debug('waiting on mesos to spawn tasks')
+        mesos_channel.send_pyobj((n, f))
+        n_fulfilled = mesos_channel.recv_pyobj()
+        log.debug('mesos spawned tasks')
         return n_fulfilled
 
     if f is None:
@@ -30,63 +35,79 @@ def wc_wrapper_factory(f):
         return warmer_cooler_wrapper
 
 
+def make_req_rep():
+    context = zmq.Context()
+    req = context.socket(zmq.REQ)
+    rep = context.socket(zmq.REP)
+    rep.bind('inproc://relay.mesos')
+    req.connect('inproc://relay.mesos')
+    return req, rep
+
+
 def main(ns):
+    log.info(
+        "Starting Relay Mesos!",
+        extra={k: str(v) for k, v in ns.__dict__.items()})
+
+    req, rep = make_req_rep()
+
     # override warmer and cooler
-    ns.warmer = wc_wrapper_factory(ns.warmer)
-    ns.cooler = wc_wrapper_factory(ns.cooler)
+    ns.warmer = wc_wrapper_factory(ns.warmer, mesos_channel=req)
+    ns.cooler = wc_wrapper_factory(ns.cooler, mesos_channel=req)
 
-    mesosloop = greenlet(init_mesos_scheduler)
-    relayloop = greenlet(relay_main, parent=mesosloop)
+    mesos = threading.Thread(
+        target=init_mesos_scheduler,
+        kwargs=dict(ns=ns, relay_channel=rep),
+        name="Relay.Mesos Scheduler")
+    relay = threading.Thread(
+        target=relay_main, args=(ns,), name="Relay.Runner Event Loop")
+    mesos.start()  # start mesos framework
+    relay.start()  # start relay's loop
 
-    mesosloop.switch(relayloop)  # start mesos framework
+    # the threads bounce control back and forth between mesos resourceOffers
+    # and Relay's warmer/cooler functions using zmq sockets.  Relay
+    # blocks until mesos resources are available.
 
-    relayloop.switch(ns)  # start Relay. greenlets bounce control back and
-    # forth between mesos resourceOffers and Relay's warmer/cooler functions.
 
+def init_mesos_scheduler(ns, relay_channel):
+    import mesos.interface
+    from mesos.interface import mesos_pb2
+    import mesos.native
 
-def init_mesos_scheduler(relayloop):
-    # TODO: this function should start a proper mesos scheduler.  get rid of
-    # while loop and everything under it goes into the resourceOffers method.
+    # build executor
+    executor = mesos_pb2.ExecutorInfo()
+    executor.executor_id.value = "Relay Executor"
+    executor.command.value = "python -m relay_mesos.executor"
+    executor.name = "Relay.Mesos executor"
+    executor.source = "relay_test"
 
-    # TODO: why does this approach not cause relay to freak out?  I think
-    # because relay blocks rather than build up an unnecessary error history
-    # that it would otherwise create if MVs didn't actually happen for some
-    # period of time.
-    log.info('Initializing Mesos Scheduler')
-    getcurrent().parent.switch()  # return context to main
+    # build framework
+    framework = mesos_pb2.FrameworkInfo()
+    framework.user = ""  # Have Mesos fill in the current user.
+    framework.name = "Relay.Mesos Test Framework"
+    framework.principal = "test-framework-python"
 
-    while True:  # assume this func is the resourceOffers that come in
-        import random
-        navailable = int(random.choice([0]*2 + [3] * 3 + [10]))
-        # navailable = 15  # lets say I figured this out in resourceOffers
+    # build driver
+    driver = mesos.native.MesosSchedulerDriver(
+        Scheduler(executor, relay_channel, dict(ns.task_resources)),
+        framework,
+        ns.mesos_master)
+    atexit.register(driver.stop)
 
-        # wait on anything to use these available offers
-        # resume control in calling context (presumably relay)
-        log.warn(
-            'Mesos has offers available',
-            extra=dict(available_offers=navailable))
-
-        nrequests, func = relayloop.switch()
-        if func and navailable > 0:
-            n = min(navailable, nrequests)
-            func(n)
-            relayloop.switch(n)
-        else:
-            relayloop.switch(None)
-
-        log.warn(
-            'Relay requested some offers', extra=dict(
-                requested_offers=nrequests, func=func and func.func_name))
-        # if nrequests == 0:
-        #     driver.declineOffer(offer.id)
-        # else:
-        #     accept nrequests offers and start tasks
+    # run things
+    status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
+    driver.stop()  # Ensure that the driver process terminates.
+    sys.exit(status)
 
 
 build_arg_parser = at.build_arg_parser([
     at.group(
         "Relay.Mesos specific parameters",
-        at.add_argument('--abc')),
+        at.add_argument('--mesos_master', default=os.getenv('MESOS_MASTER')),
+        at.add_argument(
+            '--task_resources', type=lambda x: x.split('='), nargs='*',
+            default={}),
+    )
 ],
     description="Convert your Relay app into a Mesos Framework",
     parents=[relay_ap()], conflict_handler='resolve')

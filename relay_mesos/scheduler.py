@@ -1,5 +1,8 @@
+from __future__ import division
 import random
 import sys
+import zmq
+
 import mesos.native
 import mesos.interface
 from mesos.interface import mesos_pb2
@@ -8,9 +11,9 @@ from relay import log
 
 
 # Resource types supported by Mesos
-SCALAR_KEYS = ['cpus', 'mem', 'disk']
-RANGE_KEYS = ['ports']
-SET_KEYS = ['disks']
+SCALAR_KEYS = {'cpus': float, 'mem': int, 'disk': int}
+RANGE_KEYS = {'ports': int}
+SET_KEYS = {'disks': str}
 
 
 # TODO: remove this
@@ -31,18 +34,18 @@ def filter_offers(offers, task_resources):
             "disks": ["sda1"]
         }
     """
-    available_offers = {}
+    available_offers = []
     decline_offers = []
     for offer in offers:
         ntasks = calc_tasks_per_offer(offer, task_resources)
         if ntasks == 0:
             decline_offers.append(offer)
             continue
-        available_offers[offer] = ntasks
+        available_offers.append((offer, ntasks))
     return available_offers, decline_offers
 
 
-def calc_tasks_per_offer(offer, task_resources={}):
+def calc_tasks_per_offer(offer, task_resources):
     """
     Decide how many tasks a given mesos Offer can contain.
 
@@ -60,9 +63,9 @@ def calc_tasks_per_offer(offer, task_resources={}):
     for res in offer.resources:
         if res.name not in task_resources:
             continue  # we don't care about this resource
-        reqval = task_resources.get(res.name)
         if res.name in SCALAR_KEYS:
             oval = float(res.scalar.value)
+            reqval = float(task_resources.get(res.name))
             if reqval <= oval:
                 num_tasks = min(num_tasks, int(oval / reqval))
             else:
@@ -71,6 +74,7 @@ def calc_tasks_per_offer(offer, task_resources={}):
         elif res.name in RANGE_KEYS:
             raise NotImplementedError("TODO ... not sure how to handle this")
             # what does reqval look like?
+            # reqval = float(task_resources.get(res.name))
             # if any(start <= reqval <= stop
             #        for start, stop in res.ranges.range):
             #     num_tasks = 1
@@ -107,7 +111,7 @@ def create_tasks(reqtasks, available_offers, driver, executor, task_resources):
         }
     """
     n_fulfilled = 0
-    for offer, ntasks in available_offers.items():
+    for offer, ntasks in available_offers:
         if n_fulfilled >= reqtasks:
             driver.declineOffer(offer.id)
             continue
@@ -117,7 +121,8 @@ def create_tasks(reqtasks, available_offers, driver, executor, task_resources):
                 break
             n_fulfilled += 1
 
-            tid = "%s.%s.%s" % (ID, offer.id, random.randint(1, sys.maxint))
+            tid = "%s.%s.%s" % (
+                ID, offer.id.value, random.randint(1, sys.maxint))
             log.debug(
                 "Accepting offer to start a task",
                 extra=dict(offer_host=offer.hostname, task_id=tid))
@@ -153,7 +158,8 @@ def _create_task(tid, offer, executor, task_resources):
         resource = task.resources.add()
         resource.name = key
         resource.type = mesos_pb2.Value.SCALAR
-        resource.scalar.value = task_resources[key]
+        typecast = SCALAR_KEYS[key]
+        resource.scalar.value = typecast(task_resources[key])
 
     for key in set(RANGE_KEYS).intersection(task_resources):
         seen.add(key)
@@ -162,17 +168,19 @@ def _create_task(tid, offer, executor, task_resources):
         resource.type = mesos_pb2.Value.RANGES
         for range_data in task_resources[key]:
             inst = resource.ranges.range.add()
-            inst.begin = range_data[0]
-            inst.end = range_data[1]
+            typecast = RANGE_KEYS[key]
+            inst.begin = typecast(range_data[0])
+            inst.end = typecast(range_data[1])
 
     for key in set(SET_KEYS).intersection(task_resources):
+        typecast = SET_KEYS[key]
         seen.add(key)
         resource = task.resources.add()
         resource = task.resources.add()
         resource.name = key
         resource.type = mesos_pb2.Value.SET
         for elem in task_resources[key]:
-            resource.set.item.append(elem)
+            resource.set.item.append(typecast(elem))
     unrecognized_keys = set(task_resources).difference(seen)
     if unrecognized_keys:
         msg = "Unrecognized keys in task_resources!"
@@ -182,14 +190,10 @@ def _create_task(tid, offer, executor, task_resources):
 
 
 class Scheduler(mesos.interface.Scheduler):
-    def __init__(self, executor, relayloop, task_resources):
+    def __init__(self, executor, relay_channel, task_resources):
         self.executor = executor
         self.task_resources = task_resources
-        # self.taskData = {}
-        # self.tasksLaunched = 0
-        # self.tasksFinished = 0
-        # self.messagesSent = 0
-        # self.messagesReceived = 0
+        self.relay_channel = relay_channel
 
     def registered(self, driver, frameworkId, masterInfo):
         """
@@ -201,7 +205,8 @@ class Scheduler(mesos.interface.Scheduler):
         is provided as an argument.
         """
         log.info(
-            "Registered with framework", extra=dict(framework_id=frameworkId))
+            "Registered with framework",
+            extra=dict(framework_id=frameworkId.value))
 
     def resourceOffers(self, driver, offers):
         """
@@ -219,30 +224,36 @@ class Scheduler(mesos.interface.Scheduler):
         tasks will fail with a TASK_LOST status and a message saying as much).
         """
         log.debug("Got resource offers", extra=dict(num_offers=len(offers)))
-        available_offers, decline_offers = filter_offers(offers)
+        available_offers, decline_offers = filter_offers(
+            offers, self.task_resources)
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:
+            log.debug('None of the mesos offers had enough relevant resources')
             return
-        log.warn(
+        log.debug(
             'Mesos has offers available', extra=dict(
                 available_offers=len(available_offers),
-                max_runnable_tasks=sum(available_offers.values())))
+                max_runnable_tasks=sum(x[1] for x in available_offers)))
         # get num tasks I should create from relay.  wait indefinitely.
-        reqtasks, func = self.relayloop.switch()
+        try:
+            log.debug('mesos scheduler checking for relay requests')
+            reqtasks, func = self.relay_channel.recv_pyobj()  # zmq.NOBLOCK)
+        except zmq.ZMQError:
+            log.debug('mesos scheduler has received no requests from relay')
+            reqtasks, func = 0, None
         if func is None:
-            for offer in available_offers:
+            for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
-            self.relayloop.switch(None)  # ??  # TODO: enable this?
             return
         # create tasks depending on what relay says
         # TODO: _create_task should figure out whether this is a warmer or
         # cooler
         n_fulfilled = create_tasks(
             reqtasks=reqtasks, available_offers=available_offers,
-            driver=self.driver, executor=self.executor,
+            driver=driver, executor=self.executor,
             task_resources=self.task_resources)
-        self.relayloop.switch(n_fulfilled)
+        self.relay_channel.send_pyobj(n_fulfilled)
 
     def statusUpdate(self, driver, update):
         # TODO: continue from here
