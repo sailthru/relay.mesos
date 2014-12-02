@@ -72,7 +72,6 @@ def main(ns):
 def init_mesos_scheduler(ns, relay_channel):
     import mesos.interface
     from mesos.interface import mesos_pb2
-    import mesos.native
 
     # build executor
     executor = mesos_pb2.ExecutorInfo()
@@ -88,7 +87,7 @@ def init_mesos_scheduler(ns, relay_channel):
     framework.principal = "test-framework-python"
 
     # build driver
-    driver = mesos.native.MesosSchedulerDriver(
+    driver = mesos.interface.SchedulerDriver(
         Scheduler(executor, relay_channel, dict(ns.task_resources)),
         framework,
         ns.mesos_master)

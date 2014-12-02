@@ -19,5 +19,5 @@ RUN python setup.py install
 COPY ./relay_mesos /relay.mesos/relay_mesos
 RUN python setup.py develop
 
-# EXPOSE 8080
+EXPOSE 8080
 CMD relay.mesos

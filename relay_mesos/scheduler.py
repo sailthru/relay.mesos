@@ -3,7 +3,6 @@ import random
 import sys
 import zmq
 
-import mesos.native
 import mesos.interface
 from mesos.interface import mesos_pb2
 
