@@ -239,7 +239,7 @@ class Scheduler(mesos.interface.Scheduler):
         # get num tasks I should create from relay.  wait indefinitely.
         try:
             log.debug('mesos scheduler checking for relay requests')
-            reqtasks, func = self.relay_channel.recv_pyobj()  # zmq.NOBLOCK)
+            reqtasks, func = self.relay_channel.recv_pyobj()
         except zmq.ZMQError:
             log.debug('mesos scheduler has received no requests from relay')
             reqtasks, func = 0, None

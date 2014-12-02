@@ -44,6 +44,18 @@ def make_req_rep():
     return req, rep
 
 
+def catch(func, name, errorflag):
+    """Call given func.  If an error is raised, set a flag"""
+    def f(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            log.exception(
+                'Thread failed: %s' % (name))
+            errorflag.set()
+    return f
+
+
 def main(ns):
     if ns.mesos_master is None:
         log.error("Oops!  You didn't define --mesos_master")
@@ -59,18 +71,25 @@ def main(ns):
     ns.warmer = wc_wrapper_factory(ns.warmer, mesos_channel=req)
     ns.cooler = wc_wrapper_factory(ns.cooler, mesos_channel=req)
 
+    errorflag = threading.Event()
+    mesos_name = "Relay.Mesos Scheduler"
     mesos = threading.Thread(
-        target=init_mesos_scheduler,
+        target=catch(init_mesos_scheduler, mesos_name, errorflag),
         kwargs=dict(ns=ns, relay_channel=rep),
-        name="Relay.Mesos Scheduler")
+        name=mesos_name)
+    relay_name = "Relay.Runner Event Loop"
     relay = threading.Thread(
-        target=relay_main, args=(ns,), name="Relay.Runner Event Loop")
+        target=catch(relay_main, relay_name, errorflag),
+        args=(ns,),
+        name=relay_name)
     mesos.start()  # start mesos framework
     relay.start()  # start relay's loop
-
     # the threads bounce control back and forth between mesos resourceOffers
     # and Relay's warmer/cooler functions using zmq sockets.  Relay
     # blocks until mesos resources are available.
+    if errorflag.wait():
+        raise RuntimeError('A thread failed.  Check logs for details.')
+
 
 
 def init_mesos_scheduler(ns, relay_channel):
