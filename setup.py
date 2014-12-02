@@ -20,8 +20,8 @@ setup(
     ),
     long_description="Check the project homepage for details",
     keywords=[
-        'mesos', 'marathon', 'relay', 'framework',
-        'relay', 'pid', 'pid controller', 'thermostat', 'tuning',
+        'mesos', 'marathon', 'relay', 'relay.runner', 'framework',
+        'pid', 'pid controller', 'thermostat', 'tuning',
         'oscilloscope', 'auto-scale'],
 
     author='Alex Gaudio',
@@ -47,4 +47,5 @@ setup(
             'eggsecutable = relay_mesos.__main__:go',
         ],
     },
+    zip_safe=False
 )

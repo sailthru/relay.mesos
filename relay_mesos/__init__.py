@@ -5,10 +5,8 @@ log = logging.getLogger('relay.mesos')
 from relay import configure_logging
 configure_logging(True, log=log)
 
-import os.path as _p
 import pkg_resources as _pkg_resources
-__version__ = _pkg_resources.get_distribution(
-    _p.basename(_p.dirname(_p.dirname(_p.abspath(__file__))))).version
+__version__ = _pkg_resources.get_distribution('relay.mesos').version
 
 
 def metric():
