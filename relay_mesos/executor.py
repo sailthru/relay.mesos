@@ -7,6 +7,7 @@ import threading
 
 import mesos.interface
 from mesos.interface import mesos_pb2
+import mesos.native
 
 from relay_mesos import log
 
@@ -58,5 +59,5 @@ class RelayMesosExecutor(mesos.interface.Executor):
 
 if __name__ == "__main__":
     print "Starting executor"
-    driver = mesos.interface.MesosExecutorDriver(RelayMesosExecutor())
+    driver = mesos.native.MesosExecutorDriver(RelayMesosExecutor())
     sys.exit(0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1)
