@@ -45,6 +45,10 @@ def make_req_rep():
 
 
 def main(ns):
+    if ns.mesos_master is None:
+        log.error("Oops!  You didn't define --mesos_master")
+        build_arg_parser().print_usage()
+        sys.exit(1)
     log.info(
         "Starting Relay Mesos!",
         extra={k: str(v) for k, v in ns.__dict__.items()})
