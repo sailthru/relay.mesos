@@ -21,7 +21,7 @@ class RelayMesosExecutor(mesos.interface.Executor):
         random.seed(time.time())
         self.cmd = (
             "sleep %s "
-            " ; sh -c 'echo from bash: started relay launcher task && sleep %s'"
+            "; sh -c 'echo from bash: started relay launcher task && sleep %s'"
         ) % (1 + random.random()*2, 3*random.random() + 0)
         # TODO: consider supporting pickled functions
 

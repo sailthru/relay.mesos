@@ -185,7 +185,8 @@ def _create_task(tid, offer, executor, task_resources):
     if unrecognized_keys:
         msg = "Unrecognized keys in task_resources!"
         log.error(msg, extra=dict(unrecognized_keys=unrecognized_keys))
-        raise UserWarning("%s unrecognized_keys: %s" % (msg, unrecognized_keys))
+        raise UserWarning(
+            "%s unrecognized_keys: %s" % (msg, unrecognized_keys))
     return task
 
 
