@@ -8,6 +8,7 @@ import mesos.interface
 from mesos.interface import mesos_pb2
 
 from relay import log
+from relay_mesos.util import catch
 
 
 # Resource types supported by Mesos
@@ -92,12 +93,12 @@ def calc_tasks_per_offer(offer, task_resources):
         return num_tasks
 
 
-def create_tasks(reqtasks, available_offers, driver, executor, task_resources):
+def create_tasks(MV, available_offers, driver, executor, task_resources):
     """
-    Launch up to `reqtasks` mesos tasks, depending on availability of mesos
+    Launch up to `MV` mesos tasks, depending on availability of mesos
     resources.
 
-    `reqtasks` max number of mesos tasks to spin up.  Relay chooses this number
+    `MV` max number of mesos tasks to spin up.  Relay chooses this number
     `available_offers` a dict of mesos offers and num tasks they can support
     `driver` a mesos driver instance
     `executor` a mesos executor instance
@@ -112,12 +113,12 @@ def create_tasks(reqtasks, available_offers, driver, executor, task_resources):
     """
     n_fulfilled = 0
     for offer, ntasks in available_offers:
-        if n_fulfilled >= reqtasks:
+        if n_fulfilled >= MV:
             driver.declineOffer(offer.id)
             continue
         tasks = []
         for ID in range(ntasks):
-            if n_fulfilled >= reqtasks:
+            if n_fulfilled >= MV:
                 break
             n_fulfilled += 1
 
@@ -191,10 +192,11 @@ def _create_task(tid, offer, executor, task_resources):
 
 
 class Scheduler(mesos.interface.Scheduler):
-    def __init__(self, executor, relay_channel, task_resources):
+    def __init__(self, executor, MV, task_resources, exception_sender):
         self.executor = executor
         self.task_resources = task_resources
-        self.relay_channel = relay_channel
+        self.MV = MV
+        self.exception_sender = exception_sender
 
     def registered(self, driver, frameworkId, masterInfo):
         """
@@ -210,6 +212,10 @@ class Scheduler(mesos.interface.Scheduler):
             extra=dict(framework_id=frameworkId.value))
 
     def resourceOffers(self, driver, offers):
+        catch(self._resourceOffers, self.exception_sender)(
+            driver, offers)
+
+    def _resourceOffers(self, driver, offers):
         """
         Invoked when resources have been offered to this framework. A single
         offer will only contain resources from a single slave.  Resources
@@ -237,24 +243,23 @@ class Scheduler(mesos.interface.Scheduler):
                 available_offers=len(available_offers),
                 max_runnable_tasks=sum(x[1] for x in available_offers)))
         # get num tasks I should create from relay.  wait indefinitely.
-        try:
-            log.debug('mesos scheduler checking for relay requests')
-            reqtasks, func = self.relay_channel.recv_pyobj()
-        except zmq.ZMQError:
+        with self.MV.get_lock():
+            MV = self.MV.value
+            self.MV.value = 0
+        if MV == 0:
             log.debug('mesos scheduler has received no requests from relay')
-            reqtasks, func = 0, None
-        if func is None:
             for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
             return
-        # create tasks depending on what relay says
-        # TODO: _create_task should figure out whether this is a warmer or
-        # cooler
+        # create tasks depending on what relay requests
+        # TODO: _create_task should figure out whether the executor
+        # is a warmer or cooler based on sign(MV)
         n_fulfilled = create_tasks(
-            reqtasks=reqtasks, available_offers=available_offers,
+            MV=MV, available_offers=available_offers,
             driver=driver, executor=self.executor,
             task_resources=self.task_resources)
-        self.relay_channel.send_pyobj(n_fulfilled)
+        # TODO: count how many were fulfilled?  make relay block?
+        # self.relay_channel.send_pyobj(n_fulfilled)
 
     def statusUpdate(self, driver, update):
         # TODO: continue from here
