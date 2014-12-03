@@ -1,13 +1,12 @@
 from __future__ import division
 import random
 import sys
-import zmq
 
 import mesos.native
 import mesos.interface
 from mesos.interface import mesos_pb2
 
-from relay import log
+from relay_mesos import log
 from relay_mesos.util import catch
 
 
@@ -19,6 +18,11 @@ SET_KEYS = {'disks': str}
 
 # TODO: remove this
 TOTAL_TASKS = 10
+MAX_FAILURES = 10
+
+
+class MaxFailuresReached(Exception):
+    pass
 
 
 def filter_offers(offers, task_resources):
@@ -197,6 +201,7 @@ class Scheduler(mesos.interface.Scheduler):
         self.task_resources = task_resources
         self.MV = MV
         self.exception_sender = exception_sender
+        self.failures = 0
 
     def registered(self, driver, frameworkId, masterInfo):
         """
@@ -254,40 +259,43 @@ class Scheduler(mesos.interface.Scheduler):
         # create tasks depending on what relay requests
         # TODO: _create_task should figure out whether the executor
         # is a warmer or cooler based on sign(MV)
+        # so abs(MV) should be here?
         n_fulfilled = create_tasks(
-            MV=MV, available_offers=available_offers,
+            MV=abs(MV), available_offers=available_offers,
             driver=driver, executor=self.executor,
             task_resources=self.task_resources)
         # TODO: count how many were fulfilled?  make relay block?
         # self.relay_channel.send_pyobj(n_fulfilled)
 
     def statusUpdate(self, driver, update):
-        # TODO: continue from here
-        print "Task %s is in state %d" % (update.task_id.value, update.state)
+        catch(self._statusUpdate, self.exception_sender)(driver, update)
 
-        # Ensure the binary data came through.
-        # if update.data != "data with a \0 byte":
-        #     print "The update data did not match!"
-        #     print "  Expected: 'data with a \\x00 byte'"
-        #     print "  Actual:  ", repr(str(update.data))
-        #     sys.exit(1)
-
-        # if update.state == mesos_pb2.TASK_FINISHED:
-        #     self.tasksFinished += 1
-        #     if self.tasksFinished == TOTAL_TASKS:
-        #         print "All tasks done, waiting for final framework message"
-
-        #     slave_id, executor_id = self.taskData[update.task_id.value]
-
-        #     self.messagesSent += 1
-        #     driver.sendFrameworkMessage(
-        #         executor_id,
-        #         slave_id,
-        #         'data with a \0 byte')
+    def _statusUpdate(self, driver, update):
+        log.debug('task status update: %s' % str(update.message), extra={
+            'task_id': update.task_id.value, 'state': update.state,
+            'slave_id': update.slave_id.value, 'timestamp': update.timestamp})
+        # TODO: figure out how to identify these
+        # toEnum 0 = Starting
+        # toEnum 1 = TaskRunning
+        # toEnum 2 = Finished
+        # toEnum 3 = Failed
+        # toEnum 4 = Killed
+        # toEnum 5 = Lost
+        # toEnum 6 = Staging
+        if update.state in [3, 4, 5]:
+            self.failures += 1
+        elif update.state in [2, 1]:  # TODO are these choices acceptable?
+            self.failures = max(self.failures - 1, 0)
+        if self.failures >= MAX_FAILURES:
+            log.error(
+                "Max allowable number of failures reached",
+                extra=dict(max_failures=self.failures))
+            driver.stop()
+            raise MaxFailuresReached(self.failures)
 
     def frameworkMessage(self, driver, executorId, slaveId, message):
-        # TODO: figure out when to kill the framework if too many task failures
         pass
+
         # self.messagesReceived += 1
 
         # The message bounced back as expected.
