@@ -13,19 +13,17 @@ from relay_mesos import log
 
 
 class RelayMesosExecutor(mesos.interface.Executor):
-    def __init__(self, cmd='echo TODO;sleep 5'):  # TODO: remove ='echo TODO'
-        self.cmd = cmd  # the bash command that is a warmer or cooler
-
+    def launchTask(self, driver, task):
         import random
         import time
         random.seed(time.time())
-        self.cmd = (
-            "sleep %s "
-            "; sh -c 'echo from bash: started relay launcher task && sleep %s'"
-        ) % (1 + random.random()*2, 3*random.random() + 0)
-        # TODO: consider supporting pickled functions
+        # self.cmd = (
+        #     "sleep %s "
+        #   "; sh -c 'echo from bash: started relay launcher task && sleep %s'"
+        # ) % (1 + random.random()*2, 3*random.random() + 3)
+        self.cmd = "ajaja"  # TODO: this should fail
 
-    def launchTask(self, driver, task):
+        # TODO: consider supporting pickled functions
         # Create a thread to run the task. Tasks should always be run in new
         # threads or processes, rather than inside launchTask itself.
         def run_task():
