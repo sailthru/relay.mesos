@@ -6,7 +6,6 @@ import atexit
 import multiprocessing as mp
 import os
 import sys
-import zmq
 
 from relay import argparse_shared as at
 from relay.runner import main as relay_main, build_arg_parser as relay_ap
@@ -31,15 +30,6 @@ def warmer_cooler_wrapper(MV):
                 MV.value = n
         log.debug('...finished asking mesos to spawn tasks')
     return _warmer_cooler_wrapper
-
-
-def make_req_rep():
-    context = zmq.Context()
-    req = context.socket(zmq.REQ)
-    rep = context.socket(zmq.REP)
-    rep.bind('inproc://relay.mesos')
-    req.connect('inproc://relay.mesos')
-    return req, rep
 
 
 def main(ns):
@@ -101,13 +91,13 @@ def init_mesos_scheduler(ns, MV, exception_sender):
     executor.executor_id.value = "Relay Executor"
     executor.command.value = "python -m relay_mesos.executor"
     executor.name = "Relay.Mesos executor"
-    executor.source = "relay_test"
+    executor.source = "relay_test"  # TODO: what's this?
 
     # build framework
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
-    framework.name = "Relay.Mesos Test Framework"
-    framework.principal = "test-framework-python"
+    framework.name = "Relay.Mesos Framework"
+    framework.principal = "test-framework-python"  # TODO: what is this?
 
     # build driver
     driver = mesos.native.MesosSchedulerDriver(

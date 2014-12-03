@@ -31,7 +31,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'relay.runner==0.1.4', 'mesos.cli', 'mesos.interface', 'pyzmq'],
+        'relay.runner==0.1.4', 'mesos.cli', 'mesos.interface'],
 
     extras_require={
         'mesos': ['mesos.native'],
