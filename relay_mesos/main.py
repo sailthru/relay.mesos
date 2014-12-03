@@ -86,6 +86,7 @@ def init_mesos_scheduler(ns, MV, exception_sender):
     from mesos.interface import mesos_pb2
     import mesos.native
 
+    log.info('starting mesos scheduler')
     # build executor
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = "Relay Executor"

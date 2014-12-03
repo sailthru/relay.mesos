@@ -260,10 +260,14 @@ class Scheduler(mesos.interface.Scheduler):
         # TODO: _create_task should figure out whether the executor
         # is a warmer or cooler based on sign(MV)
         # so abs(MV) should be here?
-        n_fulfilled = create_tasks(
-            MV=abs(MV), available_offers=available_offers,
-            driver=driver, executor=self.executor,
-            task_resources=self.task_resources)
+        if MV > 0:
+            n_fulfilled = create_tasks(
+                MV=abs(MV), available_offers=available_offers,
+                driver=driver, executor=self.executor,
+                task_resources=self.task_resources)
+        else:
+            for offer, _ in available_offers:
+                driver.declineOffer(offer.id)
         # TODO: count how many were fulfilled?  make relay block?
         # self.relay_channel.send_pyobj(n_fulfilled)
 

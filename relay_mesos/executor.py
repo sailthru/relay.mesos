@@ -17,11 +17,10 @@ class RelayMesosExecutor(mesos.interface.Executor):
         import random
         import time
         random.seed(time.time())
-        # self.cmd = (
-        #     "sleep %s "
-        #   "; sh -c 'echo from bash: started relay launcher task && sleep %s'"
-        # ) % (1 + random.random()*2, 3*random.random() + 3)
-        self.cmd = "ajaja"  # TODO: this should fail
+        self.cmd = (
+            "sleep %s "
+          "; sh -c 'echo from bash: started relay launcher task && sleep %s'"
+        ) % (1 + random.random()*2, 3*random.random() + 3)
 
         # TODO: consider supporting pickled functions
         # Create a thread to run the task. Tasks should always be run in new
