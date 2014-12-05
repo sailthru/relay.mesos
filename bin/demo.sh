@@ -13,14 +13,14 @@
 # ** don't forget to add env vars to your .profile **
 
 # also, you can add "<IP> docker" to /etc/hosts to make web browser work
-# for the mesos webui: http://docker:5050
-# and the relay webui: http://docker:8080  (this on in prog. TODO)
+# for the mesos webui: http://localdocker:5050
+# and the relay webui: http://localdocker:8080  (this on in prog. TODO)
 
 
 dir="$( cd "$( dirname "$( dirname "$0" )" )" && pwd )"
 
 if [ "${1:-0}" != "0" ] ; then
-  # remove previous containers in case they exist
+  echo remove previous containers in case they exist
   docker rm -f $(docker ps -a |grep relay.mesos|awk '{print $NF}')
 
   set -e
@@ -61,6 +61,8 @@ if [ "${1:-0}" != "0" ] ; then
       -e MESOS_CONTAINERIZERS=docker,mesos \
       -e MESOS_HOSTNAME=localdocker \
       -e MESOS_MASTER=zk://zookeeper:2181/mesos \
+      -e MESOS_LOG_DIR=/var/log \
+      -e MESOS_WORK_DIR=/var/lib/mesos \
       -v /tmp/mesoswork:/tmp/mesoswork \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v /sys:/sys \
@@ -71,9 +73,6 @@ if [ "${1:-0}" != "0" ] ; then
       supervisord -n
       # --privileged \
       # --net=host \
-      # -e MESOS_WORK_DIR=/tmp/mesoswork \
-      # -e MESOS_LOG_DIR=/var/log \
-      # -e MESOS_EXECUTOR_REGISTRATION_TIMEOUT=5mins \
       # -e MESOS_ISOLATOR=cgroups/cpu,cgroups/mem \
   done
 fi
@@ -83,16 +82,18 @@ docker build -t relay.mesos .
 
 docker run -d --name relay.mesos \
   --link relay.mesos__zookeeper:zookeeper \
+  -e RELAY_COOLER="echo cooler" \
+  -e RELAY_WARMER="echo warmer" \
   -t -i relay.mesos \
   bash -c \
-  'relay.mesos -w bash_echo_warmer'\
+  'relay.mesos '\
 ' -m bash_echo_metric '\
 ' -d .1 --sendstats tcp://192.168.59.3:5498'\
 ' -t 60 --task_resources cpus=1 mem=10 --lookback 300'\
 ' --mesos_master zk://zookeeper:2181/mesos'
 
 # kill this after a little while
-( (sleep 10 ;echo relay.mesos demo quiting ; docker rm -f relay.mesos) & )
+( (sleep 20 ;echo relay.mesos demo quiting ; docker rm -f relay.mesos) & )
 
 docker logs -f relay.mesos
 
