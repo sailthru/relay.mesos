@@ -51,14 +51,15 @@ def main(ns):
     exception_receiver, exception_sender = mp.Pipe(False)
 
     # copy and then override warmer and cooler
-    warmer_func, cooler_func = ns.warmer, ns.cooler
+    warmer, cooler = ns.warmer, ns.cooler
     ns.warmer = warmer_cooler_wrapper(MV)
     ns.cooler = warmer_cooler_wrapper(MV)
 
     mesos_name = "Relay.Mesos Scheduler"
     mesos = mp.Process(
         target=catch(init_mesos_scheduler, exception_sender),
-        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender),
+        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender,
+                    warmer=warmer, cooler=cooler),
         name=mesos_name)
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
@@ -81,18 +82,30 @@ def main(ns):
     # is fulfilled the moment mesos resources are available.
 
 
-def init_mesos_scheduler(ns, MV, exception_sender):
+def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
     import mesos.interface
     from mesos.interface import mesos_pb2
-    import mesos.native
+    try:
+        import mesos.native
+    except ImportError:
+        log.error(
+            "Oops! Mesos native bindings are not installed.  You can download"
+            " these binaries from mesosphere.")
+        raise
 
     log.info('starting mesos scheduler')
     # build executor
-    executor = mesos_pb2.ExecutorInfo()
-    executor.executor_id.value = "Relay Executor"
-    executor.command.value = "python -m relay_mesos.executor"
-    executor.name = "Relay.Mesos executor"
-    executor.source = "relay_test"  # TODO: what's this?
+    executor = 1
+    # TODO: remove executor?
+    # executor = mesos_pb2.ExecutorInfo()
+    # executor.executor_id.value = "Relay Executor"
+    # # executor.command.value = "python -m relay_mesos.executor"  # docker
+    # executor.command.value = "python -m relay_mesos.executor"  # docker
+    # executor.name = "Relay.Mesos executor"
+    # # executor.source = "relay_test"  # TODO: what's this?
+    # # TRY DOCKER
+    # executor.container.docker.image = 'relay.mesos'
+    # executor.container.type = executor.container.DOCKER
 
     # build framework
     framework = mesos_pb2.FrameworkInfo()
@@ -104,7 +117,7 @@ def init_mesos_scheduler(ns, MV, exception_sender):
     driver = mesos.native.MesosSchedulerDriver(
         Scheduler(
             executor=executor, MV=MV, task_resources=dict(ns.task_resources),
-            exception_sender=exception_sender),
+            exception_sender=exception_sender, warmer=warmer, cooler=cooler),
         framework,
         ns.mesos_master)
     atexit.register(driver.stop)
@@ -122,7 +135,13 @@ build_arg_parser = at.build_arg_parser([
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
             default={}),
-    )
+    ),
+    at.warmer(type=str, help=(
+        "A bash command to run on a mesos slave."
+        " A warmer should eventually increase metric values.")),
+    at.cooler(type=str, help=(
+        "A bash command to run on a mesos slave."
+        " A cooler should eventually decrease metric values.")),
 ],
     description="Convert your Relay app into a Mesos Framework",
     parents=[relay_ap()], conflict_handler='resolve')
