@@ -1,7 +1,6 @@
-- get demo running properly using docker?
 - have keyboard interrupt in parent process trigger termination of children
 
-- have a development docker container that loads python code in a volume
+- have the development docker container load python code in a volume
 - relay.mesos should run executors as docker containers
 - the mesos slave docker image should be a simple mesos slave that accepts containers
 
