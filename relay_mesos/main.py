@@ -119,10 +119,11 @@ def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
 build_arg_parser = at.build_arg_parser([
     at.group(
         "Relay.Mesos specific parameters",
-        at.add_argument('--mesos_master', default=os.getenv('MESOS_MASTER')),
+        at.add_argument(
+            '--mesos_master', default=os.getenv('RELAY_MESOS_MASTER')),
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
-            default={}),
+            default=os.getenv('RELAY_TASK_RESOURCES', {})),
     ),
     at.warmer(type=str, help=(
         "A bash command to run on a mesos slave."
