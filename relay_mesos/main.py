@@ -94,18 +94,6 @@ def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
         raise
 
     log.info('starting mesos scheduler')
-    # build executor
-    executor = 1
-    # TODO: remove executor?
-    # executor = mesos_pb2.ExecutorInfo()
-    # executor.executor_id.value = "Relay Executor"
-    # # executor.command.value = "python -m relay_mesos.executor"  # docker
-    # executor.command.value = "python -m relay_mesos.executor"  # docker
-    # executor.name = "Relay.Mesos executor"
-    # # executor.source = "relay_test"  # TODO: what's this?
-    # # TRY DOCKER
-    # executor.container.docker.image = 'relay.mesos'
-    # executor.container.type = executor.container.DOCKER
 
     # build framework
     framework = mesos_pb2.FrameworkInfo()
@@ -116,7 +104,7 @@ def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
     # build driver
     driver = mesos.native.MesosSchedulerDriver(
         Scheduler(
-            executor=executor, MV=MV, task_resources=dict(ns.task_resources),
+            MV=MV, task_resources=dict(ns.task_resources),
             exception_sender=exception_sender, warmer=warmer, cooler=cooler),
         framework,
         ns.mesos_master)

@@ -96,7 +96,7 @@ def calc_tasks_per_offer(offer, task_resources):
         return num_tasks
 
 
-def create_tasks(MV, available_offers, driver, executor, task_resources,
+def create_tasks(MV, available_offers, driver, task_resources,
                  command):
     """
     Launch up to `MV` mesos tasks, depending on availability of mesos
@@ -105,7 +105,6 @@ def create_tasks(MV, available_offers, driver, executor, task_resources,
     `MV` max number of mesos tasks to spin up.  Relay chooses this number
     `available_offers` a dict of mesos offers and num tasks they can support
     `driver` a mesos driver instance
-    `executor` a mesos executor instance
     `task_resources` the stuff a task would consume:
         {
             "cpus": 10,
@@ -132,17 +131,16 @@ def create_tasks(MV, available_offers, driver, executor, task_resources,
                 "Accepting offer to start a task",
                 extra=dict(offer_host=offer.hostname, task_id=tid))
             task = _create_task(
-                tid, offer, executor, task_resources, command)
+                tid, offer, task_resources, command)
             tasks.append(task)
         driver.launchTasks(offer.id, tasks)
     return n_fulfilled
 
 
-def _create_task(tid, offer, executor, task_resources, command):
+def _create_task(tid, offer, task_resources, command):
     """
     `tid` (str) task id
     `offer` a mesos Offer instance
-    `executor` a mesos Executor instance
     `task_resources` the stuff a task would consume:
         {
             "cpus": 10,
@@ -156,7 +154,7 @@ def _create_task(tid, offer, executor, task_resources, command):
     task.task_id.value = tid
     task.slave_id.value = offer.slave_id.value
     task.name = "task %s" % tid
-    # task.executor.MergeFrom(executor)  # TODO: support docker containers
+    # TODO: Docker
     task.command.value = command
     seen = set()
     for key in set(SCALAR_KEYS).intersection(task_resources):
@@ -197,11 +195,10 @@ def _create_task(tid, offer, executor, task_resources, command):
 
 
 class Scheduler(mesos.interface.Scheduler):
-    def __init__(self, executor, MV, task_resources, exception_sender,
+    def __init__(self, MV, task_resources, exception_sender,
                  warmer, cooler):
         self.warmer = warmer
         self.cooler = cooler
-        self.executor = executor
         self.task_resources = task_resources
         self.MV = MV
         self.exception_sender = exception_sender
@@ -267,8 +264,7 @@ class Scheduler(mesos.interface.Scheduler):
             command = self.cooler
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
-            driver=driver, executor=self.executor,
-            task_resources=self.task_resources, command=command)
+            driver=driver, task_resources=self.task_resources, command=command)
         # TODO: count how many were fulfilled?  make relay block?
         # n_fulfilled = create_tasks(...)
         # self.relay_channel.send_pyobj(n_fulfilled)
