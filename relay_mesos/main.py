@@ -1,10 +1,7 @@
-"""
-Bootstrap the execution of Relay but first do the things necessary to setup
-Relay as a Mesos Framework
-"""
 import atexit
 import multiprocessing as mp
 import os
+import signal
 import sys
 
 from relay import argparse_shared as at
@@ -33,6 +30,18 @@ def warmer_cooler_wrapper(MV):
 
 
 def main(ns):
+    """
+    Run Relay as a Mesos framework.
+    Relay's event loop and the Mesos scheduler each run in separate processes
+    and communicate through a multiprocessing.Pipe.
+
+    These two processes bounce control back and forth between mesos
+    resourceOffers and Relay's warmer/cooler functions.  Relay warmer/cooler
+    functions request that mesos tasks get spun up, but those requests are only
+    filled if the mesos scheduler receives enough relevant offers.  Relay's
+    requests don't build up: only the largest request since the last fulfilled
+    request is fulfilled at moment enough mesos resources are available.
+    """
     if ns.mesos_master is None:
         log.error("Oops!  You didn't define --mesos_master")
         build_arg_parser().print_usage()
@@ -67,18 +76,44 @@ def main(ns):
         name=relay_name)
     mesos.start()  # start mesos framework
     relay.start()  # start relay's loop
-    err = exception_receiver.recv()
-    if err:
-        log.error(
-            'Terminating child processes because one of them raised'
-            ' an exception')
-        relay.terminate()
-        mesos.terminate()
+
+    def kill_children(signal, frame):
+        log.error('Received a signal that is trying to terminate this process.'
+                  ' Terminating mesos and relay child processes!', extra=dict(
+                  signal=signal))
+        try:
+            mesos.terminate()
+            log.info('terminated mesos scheduler')
+        except:
+            log.exception('could not terminate mesos scheduler')
+        try:
+            relay.terminate()
+            log.info('terminated relay')
+        except:
+            log.exception('could not terminate relay')
         sys.exit(1)
-    # the threads bounce control back and forth between mesos resourceOffers
-    # and Relay's warmer/cooler functions.
-    # Relay requests resources, but only the resource with largest magnitude
-    # is fulfilled the moment mesos resources are available.
+    signal.signal(signal.SIGTERM, kill_children)
+    signal.signal(signal.SIGINT, kill_children)
+    while True:
+        if exception_receiver.poll():
+            err = exception_receiver.recv()
+            relay.is_alive()
+            log.error(
+                'Terminating child processes because one of them raised'
+                ' an exception', extra=dict(was_it_relay=not relay.is_alive(),
+                                            was_it_mesos=not mesos.is_alive()))
+            break
+        if not relay.is_alive():
+            log.error("Relay died.  Check logs to see why.")
+            break
+        if not mesos.is_alive():
+            log.error(
+                "Mesos Scheduler died and didn't notify me of its exception."
+                "  This may be a code bug.  Check logs.")
+            break
+    relay.terminate()
+    mesos.terminate()
+    sys.exit(1)
 
 
 def init_mesos_scheduler(ns, MV, exception_sender):
