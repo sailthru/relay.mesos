@@ -15,11 +15,6 @@ RANGE_KEYS = {'ports': int}
 SET_KEYS = {'disks': str}
 
 
-# TODO: remove this
-TOTAL_TASKS = 10
-MAX_FAILURES = 10000
-
-
 class MaxFailuresReached(Exception):
     pass
 
@@ -97,7 +92,7 @@ def calc_tasks_per_offer(offer, task_resources):
 
 
 def create_tasks(MV, available_offers, driver, task_resources,
-                 command):
+                 command, docker_image):
     """
     Launch up to `MV` mesos tasks, depending on availability of mesos
     resources.
@@ -113,6 +108,7 @@ def create_tasks(MV, available_offers, driver, task_resources,
             "ports": [(20, 34), (35, 35)],
             "disks": ["sda1"]
         }
+    `docker_image` (str|None) a docker image you wish to execute the command in
     """
     n_fulfilled = 0
     for offer, ntasks in available_offers:
@@ -131,13 +127,13 @@ def create_tasks(MV, available_offers, driver, task_resources,
                 "Accepting offer to start a task",
                 extra=dict(offer_host=offer.hostname, task_id=tid))
             task = _create_task(
-                tid, offer, task_resources, command)
+                tid, offer, task_resources, command, docker_image)
             tasks.append(task)
         driver.launchTasks(offer.id, tasks)
     return n_fulfilled
 
 
-def _create_task(tid, offer, task_resources, command):
+def _create_task(tid, offer, task_resources, command, docker_image):
     """
     `tid` (str) task id
     `offer` a mesos Offer instance
@@ -149,13 +145,16 @@ def _create_task(tid, offer, task_resources, command):
             "ports": [(20, 34), (35, 35)],
             "disks": ["sda1"]
         }
+    `docker_image` (str|None) a docker image you wish to execute the command in
     """
     task = mesos_pb2.TaskInfo()
     task.task_id.value = tid
     task.slave_id.value = offer.slave_id.value
     task.name = "task %s" % tid
-    # TODO: Docker
     task.command.value = command
+    if docker_image:
+        task.container.docker.image = docker_image
+        task.container.type = task.container.DOCKER
     seen = set()
     for key in set(SCALAR_KEYS).intersection(task_resources):
         seen.add(key)
@@ -195,11 +194,8 @@ def _create_task(tid, offer, task_resources, command):
 
 
 class Scheduler(mesos.interface.Scheduler):
-    def __init__(self, MV, task_resources, exception_sender,
-                 warmer, cooler):
-        self.warmer = warmer
-        self.cooler = cooler
-        self.task_resources = task_resources
+    def __init__(self, MV, exception_sender, ns):
+        self.ns = ns
         self.MV = MV
         self.exception_sender = exception_sender
         self.failures = 0
@@ -214,8 +210,19 @@ class Scheduler(mesos.interface.Scheduler):
         is provided as an argument.
         """
         log.info(
-            "Registered with framework",
-            extra=dict(framework_id=frameworkId.value))
+            "Registered with master", extra=dict(
+                framework_id=frameworkId.value, master_pid=masterInfo.pid,
+                master_hostname=masterInfo.hostname, master_id=masterInfo.id,
+                master_ip=masterInfo.ip, master_port=masterInfo.port,
+            ))
+
+    def reregistered(driver, masterInfo):
+        log.info(
+            "Re-registered with master", extra=dict(
+                master_pid=masterInfo.pid,
+                master_hostname=masterInfo.hostname, master_id=masterInfo.id,
+                master_ip=masterInfo.ip, master_port=masterInfo.port,
+            ))
 
     def resourceOffers(self, driver, offers):
         catch(self._resourceOffers, self.exception_sender)(
@@ -238,7 +245,7 @@ class Scheduler(mesos.interface.Scheduler):
         """
         log.debug("Got resource offers", extra=dict(num_offers=len(offers)))
         available_offers, decline_offers = filter_offers(
-            offers, self.task_resources)
+            offers, dict(self.ns.task_resources))
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:
@@ -259,13 +266,15 @@ class Scheduler(mesos.interface.Scheduler):
             return
         # create tasks that fulfill relay's requests
         if MV > 0:
-            command = self.warmer
+            command = self.ns.warmer
         elif MV < 0:
-            command = self.cooler
+            command = self.ns.cooler
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
-            driver=driver, task_resources=self.task_resources, command=command)
-        # TODO: count how many were fulfilled?  make relay block?
+            driver=driver, task_resources=dict(self.ns.task_resources),
+            command=command, docker_image=self.ns.docker_image
+        )
+        # TODO: send back to relay?  relay would need to support it
         # n_fulfilled = create_tasks(...)
         # self.relay_channel.send_pyobj(n_fulfilled)
 
@@ -276,19 +285,15 @@ class Scheduler(mesos.interface.Scheduler):
         log.debug('task status update: %s' % str(update.message), extra={
             'task_id': update.task_id.value, 'state': update.state,
             'slave_id': update.slave_id.value, 'timestamp': update.timestamp})
-        # TODO: figure out how to identify these
-        # toEnum 0 = Starting
-        # toEnum 1 = TaskRunning
-        # toEnum 2 = Finished
-        # toEnum 3 = Failed
-        # toEnum 4 = Killed
-        # toEnum 5 = Lost
-        # toEnum 6 = Staging
-        if update.state in [3, 4, 5]:
+        if self.ns.max_failures == -1:
+            return  # don't quit even if you are getting failures
+
+        m = mesos_pb2
+        if update.state in [m.TASK_FAILED, m.TASK_LOST]:
             self.failures += 1
-        elif update.state in [2, 1]:  # TODO are these choices acceptable?
+        elif update.state in [m.TASK_FINISHED, m.TASK_STARTING]:
             self.failures = max(self.failures - 1, 0)
-        if self.failures >= MAX_FAILURES:
+        if self.failures >= self.ns.max_failures:
             log.error(
                 "Max allowable number of failures reached",
                 extra=dict(max_failures=self.failures))
@@ -296,22 +301,9 @@ class Scheduler(mesos.interface.Scheduler):
             raise MaxFailuresReached(self.failures)
 
     def frameworkMessage(self, driver, executorId, slaveId, message):
-        pass
-
-        # self.messagesReceived += 1
-
-        # The message bounced back as expected.
-        # if message != "data with a \0 byte":
-        #     print "The returned message data did not match!"
-        #     print "  Expected: 'data with a \\x00 byte'"
-        #     print "  Actual:  ", repr(str(message))
-        #     sys.exit(1)
-        # print "Received message:", repr(str(message))
-
-        # if self.messagesReceived == TOTAL_TASKS:
-        #     if self.messagesReceived != self.messagesSent:
-        #         print "Sent", self.messagesSent,
-        #         print "but received", self.messagesReceived
-        #         sys.exit(1)
-        #     print "All tasks done, and all messages received, exiting"
-        #     driver.stop()
+        """
+        Invoked when a slave has been determined unreachable (e.g.,
+        machine failure, network partition) Most frameworks will need to
+        reschedule any tasks launched on this slave on a new slave.
+        """
+        pass  # Relay will recover

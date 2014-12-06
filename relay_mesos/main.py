@@ -51,20 +51,19 @@ def main(ns):
     exception_receiver, exception_sender = mp.Pipe(False)
 
     # copy and then override warmer and cooler
-    warmer, cooler = ns.warmer, ns.cooler
-    ns.warmer = warmer_cooler_wrapper(MV)
-    ns.cooler = warmer_cooler_wrapper(MV)
+    ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
+    ns_relay.warmer = warmer_cooler_wrapper(MV)
+    ns_relay.cooler = warmer_cooler_wrapper(MV)
 
     mesos_name = "Relay.Mesos Scheduler"
     mesos = mp.Process(
         target=catch(init_mesos_scheduler, exception_sender),
-        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender,
-                    warmer=warmer, cooler=cooler),
+        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender),
         name=mesos_name)
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
         target=catch(relay_main, exception_sender),
-        args=(ns,),
+        args=(ns_relay,),
         name=relay_name)
     mesos.start()  # start mesos framework
     relay.start()  # start relay's loop
@@ -82,7 +81,7 @@ def main(ns):
     # is fulfilled the moment mesos resources are available.
 
 
-def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
+def init_mesos_scheduler(ns, MV, exception_sender):
     import mesos.interface
     from mesos.interface import mesos_pb2
     try:
@@ -103,9 +102,7 @@ def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
 
     # build driver
     driver = mesos.native.MesosSchedulerDriver(
-        Scheduler(
-            MV=MV, task_resources=dict(ns.task_resources),
-            exception_sender=exception_sender, warmer=warmer, cooler=cooler),
+        Scheduler(MV=MV, exception_sender=exception_sender, ns=ns),
         framework,
         ns.mesos_master)
     atexit.register(driver.stop)
@@ -118,19 +115,41 @@ def init_mesos_scheduler(ns, MV, exception_sender, warmer, cooler):
 
 build_arg_parser = at.build_arg_parser([
     at.group(
-        "Relay.Mesos specific parameters",
+        "How does Relay.mesos affect your metric?",
+        at.warmer(type=str, help=(
+            "A bash command to run on a mesos slave."
+            " A warmer should eventually increase metric values.")),
+        at.cooler(type=str, help=(
+            "A bash command to run on a mesos slave."
+            " A cooler should eventually decrease metric values.")),
+    ),
+    at.group(
+        "Relay.Mesos parameters",
         at.add_argument(
-            '--mesos_master', default=os.getenv('RELAY_MESOS_MASTER')),
+            '--mesos_master', default=os.getenv('RELAY_MESOS_MASTER'),
+            help="URI to mesos master. We support whatever mesos supports"
+        ),
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
-            default=os.getenv('RELAY_TASK_RESOURCES', {})),
+            default=os.getenv('RELAY_TASK_RESOURCES', {}), help=(
+                "Specify what resources your task needs to execute.  These"
+                " can be any recognized mesos resource"
+                "  ie: --task_resources cpus=10 mem=30000"
+            )),
+        at.add_argument(
+            '--docker_image', default=os.getenv('RELAY_DOCKER_IMAGE'), help=(
+                "The name of a docker image if you wish to execute the"
+                " warmer and cooler in it")),
+        at.add_argument(
+            '--max_failures', type=int, default=-1, help=(
+                "If tasks are failing too often, stop the driver and raise"
+                " an error.  If given, this (always positive) number"
+                " is a running count of (failures - successes - starting)"
+                " tasks.  It is sensitive to many consecutive failures and"
+                " will mostly ignore failures if a lot of tasks"
+                " are starting or completing at once"
+            )),
     ),
-    at.warmer(type=str, help=(
-        "A bash command to run on a mesos slave."
-        " A warmer should eventually increase metric values.")),
-    at.cooler(type=str, help=(
-        "A bash command to run on a mesos slave."
-        " A cooler should eventually decrease metric values.")),
 ],
     description="Convert your Relay app into a Mesos Framework",
     parents=[relay_ap()], conflict_handler='resolve')
