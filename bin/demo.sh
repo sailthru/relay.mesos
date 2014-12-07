@@ -28,7 +28,8 @@ if [ "${1:-0}" != "0" ] || \
   [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
 then
   echo remove previous containers in case they exist
-  docker ps -a |grep relay.mesos|awk '{print $1}'|xargs docker rm -f
+  docker ps -a |grep relay.mesos|awk '{print $1}' \
+    |xargs --no-run-if-empty docker rm -f
   if [ "${1:-0}" = "-1" ] ; then
     echo done removing prev containers
     echo exiting
