@@ -17,11 +17,23 @@
 # and the relay webui: http://localdocker:8080  (this on in prog. TODO)
 
 
-dir="$( cd "$( dirname "$( dirname "$0" )" )" && pwd )"
+# ./bin/demo.sh  # start this demo
+# ./bin/demo.sh -1  # remove the docker images used in this demo
 
-if [ "${1:-0}" != "0" ] ; then
+
+dir="$( cd "$( dirname "$( dirname "$0" )" )" && pwd )"
+num_dependent_images=3  # ie zookeeper, mesos-master and mesos-slave
+
+if [ "${1:-0}" != "0" ] || \
+  [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
+then
   echo remove previous containers in case they exist
-  docker rm -f $(docker ps -a |grep relay.mesos|awk '{print $NF}')
+  docker ps -a |grep relay.mesos|awk '{print $1}'|xargs docker rm -f
+  if [ "${1:-0}" = "-1" ] ; then
+    echo done removing prev containers
+    echo exiting
+    exit 0
+  fi
 
   set -e
   set -u
@@ -75,6 +87,19 @@ if [ "${1:-0}" != "0" ] ; then
       # --net=host \
       # -e MESOS_ISOLATOR=cgroups/cpu,cgroups/mem \
   done
+
+  echo -e "\n"
+  echo Checking for $num_dependent_images images:
+  docker ps -a|grep relay.mesos|awk '{print $NF}'
+  echo -e "\n"
+  sleep .5
+  if [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
+  then
+    echo oops! docker didn\'t start at least one of the dependent images.
+    echo you should check docker logs:
+    echo '$ docker logs <image>'
+    exit 1
+  fi
 fi
 
 
