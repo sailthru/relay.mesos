@@ -1,6 +1,6 @@
-- have keyboard interrupt in parent process trigger termination of children
-
-- have the development docker container load python code in a volume
-- relay.mesos should run executors as docker containers
-- the mesos slave docker image should be a simple mesos slave that accepts containers
-
+- get demo running properly using docker?
+- have a development docker container that loads python code in a volume
+- add README
+- demo:
+  - make metric func that tracks num tasks in mesos hook into demo.sh
+  - add the relay web ui  (maybe by pushing a public docker image)
