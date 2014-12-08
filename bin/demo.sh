@@ -80,8 +80,7 @@ then
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v /sys:/sys \
       -v /proc:/proc \
-      -p 505$n:505$n \
-      -v $dir/relay_mesos:/mnt/relay_mesos \
+      -p `expr 5050 + $n`:`expr 5050 + $n` \
       breerly/mesos \
       supervisord -n
       # --privileged \
@@ -89,11 +88,12 @@ then
       # -e MESOS_ISOLATOR=cgroups/cpu,cgroups/mem \
   done
 
+  sleep .5
+
   echo -e "\n"
   echo Checking for $num_dependent_images images:
   docker ps -a|grep relay.mesos|awk '{print $NF}'
   echo -e "\n"
-  sleep .5
   if [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
   then
     echo oops! docker didn\'t start at least one of the dependent images.
