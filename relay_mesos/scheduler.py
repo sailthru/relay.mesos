@@ -259,16 +259,18 @@ class Scheduler(mesos.interface.Scheduler):
         with self.MV.get_lock():
             MV = self.MV.value
             self.MV.value = 0
+        # create tasks that fulfill relay's requests or return
         if MV == 0:
             log.debug('mesos scheduler has received no requests from relay')
             for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
             return
-        # create tasks that fulfill relay's requests
-        if MV > 0:
+        elif MV > 0 and self.ns.warmer:
             command = self.ns.warmer
-        elif MV < 0:
+        elif MV < 0 and self.ns.cooler:
             command = self.ns.cooler
+        else:
+            return
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
             driver=driver, task_resources=dict(self.ns.task_resources),

@@ -61,8 +61,10 @@ def main(ns):
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
-    ns_relay.warmer = warmer_cooler_wrapper(MV)
-    ns_relay.cooler = warmer_cooler_wrapper(MV)
+    if ns.warmer:
+        ns_relay.warmer = warmer_cooler_wrapper(MV)
+    if ns.cooler:
+        ns_relay.cooler = warmer_cooler_wrapper(MV)
 
     mesos_name = "Relay.Mesos Scheduler"
     mesos = mp.Process(
