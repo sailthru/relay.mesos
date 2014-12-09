@@ -14,7 +14,7 @@ RUN curl -o miniconda.sh http://repo.continuum.io/miniconda/Miniconda-3.7.0-Linu
 RUN curl -o mesos.egg http://downloads.mesosphere.io/master/ubuntu/14.04/mesos-0.20.1-py2.7-linux-x86_64.egg \
   && conda install setuptools numpy pyzmq
 
-ENV PYTHONPATH /relay.mesos/mesos.egg:$PYTHONPATH
+ENV PYTHONPATH /relay.mesos:/relay.mesos/mesos.egg:$PYTHONPATH
 COPY ./setup.py /relay.mesos/
 RUN python setup.py install
 COPY ./relay_mesos /relay.mesos/relay_mesos

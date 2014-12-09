@@ -4,28 +4,29 @@
 # It then runs relay.mesos as a mesos framework inside a docker container.
 
 
-# To see relay.mesos in action, navidate your browser to:
-#     http://docker:8080  # relay.mesos
-#     http://docker:5050  # mesos
-
 # install boot2docker
 # https://docs.docker.com/installation/mac/
 # ** don't forget to add env vars to your .profile **
 
-# also, you can add "<IP> docker" to /etc/hosts to make web browser work
+# Then, add "<IP> docker" to /etc/hosts to make web browser work
 # for the mesos webui: http://localdocker:5050
 # and the relay webui: http://localdocker:8080  (this on in prog. TODO)
 
+# To see relay.mesos in action, navigate your browser to:
+#     http://localdocker:8080  # relay.mesos
+#     http://localdocker:5050  # mesos
 
-# ./bin/demo.sh  # start this demo
-# ./bin/demo.sh -1  # remove the docker images used in this demo
+# Run this script.  When you run this for the first time, docker may need to
+# download a lot of the required images to get mesos running on your computer
+# ./bin/demo.sh N  # run demo with N mesos slaves  (N=1 is plenty)
+# ./bin/demo.sh -1  # remove all docker containers used in this demo
 
 
 dir="$( cd "$( dirname "$( dirname "$0" )" )" && pwd )"
-num_dependent_images=3  # ie zookeeper, mesos-master and mesos-slave
+num_dependent_images=$(expr 2 + ${1:-1})
 
-if [ "${1:-0}" != "0" ] || \
-  [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
+if [ "${1:--1}" = "-1" ] || \
+  [ "`docker ps|grep relay.mesos |wc -l |tr -d ' '`" != "$num_dependent_images" ]
 then
   echo remove previous containers in case they exist
   docker ps -a |grep relay.mesos|awk '{print $1}' \
@@ -94,7 +95,7 @@ then
   echo Checking for $num_dependent_images images:
   docker ps -a|grep relay.mesos|awk '{print $NF}'
   echo -e "\n"
-  if [ "`docker ps|grep relay.mesos |wc -l`" != "$num_dependent_images" ]
+  if [ "`docker ps|grep relay.mesos |wc -l |tr -d ' '`" != "$num_dependent_images" ]
   then
     echo oops! docker didn\'t start at least one of the dependent images.
     echo you should check docker logs:
@@ -106,22 +107,16 @@ fi
 
 docker build -t relay.mesos .
 
-docker run -d --name relay.mesos \
+docker run --rm --name relay.mesos \
   --link relay.mesos__zookeeper:zookeeper \
-  -e RELAY_COOLER="echo cooler" \
-  -e RELAY_WARMER="echo warmer" \
+  -e RELAY_WARMER="sleep 3" \
+  -e RELAY_METRIC="relay_mesos.for_demo.num_active_mesos_tasks" \
   -t -i relay.mesos \
   bash -c \
   'relay.mesos '\
-' -m bash_echo_metric '\
 ' -d .1 --sendstats tcp://192.168.59.3:5498'\
-' -t 60 --task_resources cpus=1 mem=10 --lookback 300'\
+' -t 60 --task_resources cpus=0.1 mem=1 --lookback 300'\
 ' --mesos_master zk://zookeeper:2181/mesos'
-
-# kill this after a little while
-( (sleep 20 ;echo relay.mesos demo quiting ; docker rm -f relay.mesos) & )
-
-docker logs -f relay.mesos
 
 
 # helpful
