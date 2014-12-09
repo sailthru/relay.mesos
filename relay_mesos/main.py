@@ -23,6 +23,7 @@ def warmer_cooler_wrapper(MV):
         # we can too!
         log.debug('asking mesos to spawn tasks')
         with MV.get_lock():
+            # max MV since tasks last run on mesos
             if abs(MV.value) < abs(n):
                 MV.value = n
         log.debug('...finished asking mesos to spawn tasks')
@@ -58,6 +59,8 @@ def main(ns):
 
     # store exceptions that may be raised
     exception_receiver, exception_sender = mp.Pipe(False)
+    # notify relay when mesos framework is ready
+    mesos_ready = mp.Condition()
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
@@ -69,12 +72,13 @@ def main(ns):
     mesos_name = "Relay.Mesos Scheduler"
     mesos = mp.Process(
         target=catch(init_mesos_scheduler, exception_sender),
-        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender),
+        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender,
+                    mesos_ready=mesos_ready),
         name=mesos_name)
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
-        target=catch(relay_main, exception_sender),
-        args=(ns_relay,),
+        target=catch(init_relay, exception_sender),
+        args=(ns_relay, mesos_ready),
         name=relay_name)
     mesos.start()  # start mesos framework
     relay.start()  # start relay's loop
@@ -118,7 +122,15 @@ def main(ns):
     sys.exit(1)
 
 
-def init_mesos_scheduler(ns, MV, exception_sender):
+def init_relay(ns_relay, mesos_ready):
+    log.debug('Relay waiting to start until mesos framework is registered')
+    mesos_ready.acquire()
+    mesos_ready.wait()
+    log.debug('Relay notified that mesos framework is registered')
+    relay_main(ns_relay)
+
+
+def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     import mesos.interface
     from mesos.interface import mesos_pb2
     try:
@@ -139,7 +151,9 @@ def init_mesos_scheduler(ns, MV, exception_sender):
 
     # build driver
     driver = mesos.native.MesosSchedulerDriver(
-        Scheduler(MV=MV, exception_sender=exception_sender, ns=ns),
+        Scheduler(
+            MV=MV, exception_sender=exception_sender, mesos_ready=mesos_ready,
+            ns=ns),
         framework,
         ns.mesos_master)
     atexit.register(driver.stop)
@@ -168,7 +182,8 @@ build_arg_parser = at.build_arg_parser([
         ),
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
-            default=os.getenv('RELAY_TASK_RESOURCES', {}), help=(
+            default=dict(x.split('=') for x in os.getenv(
+                'RELAY_TASK_RESOURCES', '').split(' ')), help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource"
                 "  ie: --task_resources cpus=10 mem=30000"
@@ -178,7 +193,8 @@ build_arg_parser = at.build_arg_parser([
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
         at.add_argument(
-            '--max_failures', type=int, default=-1, help=(
+            '--max_failures', type=int,
+            default=os.getenv('RELAY_MAX_FAILURES', -1), help=(
                 "If tasks are failing too often, stop the driver and raise"
                 " an error.  If given, this (always positive) number"
                 " is a running count of (failures - successes - starting)"

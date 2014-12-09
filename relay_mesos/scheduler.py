@@ -194,9 +194,10 @@ def _create_task(tid, offer, task_resources, command, docker_image):
 
 
 class Scheduler(mesos.interface.Scheduler):
-    def __init__(self, MV, exception_sender, ns):
+    def __init__(self, MV, exception_sender, mesos_ready, ns):
         self.ns = ns
         self.MV = MV
+        self.mesos_ready = mesos_ready
         self.exception_sender = exception_sender
         self.failures = 0
 
@@ -209,6 +210,14 @@ class Scheduler(mesos.interface.Scheduler):
         MasterInfo containing the updated information about the elected master
         is provided as an argument.
         """
+        catch(self._registered, self.exception_sender)(
+            driver, frameworkId, masterInfo)
+
+    def _registered(self, driver, frameworkId, masterInfo):
+        self.mesos_ready.acquire()
+        self.mesos_ready.notify()
+        self.mesos_ready.release()
+
         log.info(
             "Registered with master", extra=dict(
                 framework_id=frameworkId.value, master_pid=masterInfo.pid,
@@ -270,6 +279,8 @@ class Scheduler(mesos.interface.Scheduler):
         elif MV < 0 and self.ns.cooler:
             command = self.ns.cooler
         else:
+            for offer, _ in available_offers:
+                driver.declineOffer(offer.id)
             return
         create_tasks(
             MV=abs(MV), available_offers=available_offers,

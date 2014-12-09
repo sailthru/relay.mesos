@@ -1,29 +1,35 @@
 #!/usr/bin/env bash
 
 # This script runs zookeeper and mesos inside docker containers.
-# It then runs relay.mesos as a mesos framework inside a docker container.
+# It then runs relay.mesos inside a docker container.
 
 
-# install boot2docker
-# https://docs.docker.com/installation/mac/
-# ** don't forget to add env vars to your .profile **
+# install docker
+# https://docs.docker.com/installation
+# (if on a mac, you may need boot2docker and
+#  don't forget to add env vars to your .profile)
+# (if on ubuntu, you may need 3.16 kernel or later)
 
-# Then, add "<IP> docker" to /etc/hosts to make web browser work
-# for the mesos webui: http://localdocker:5050
-# and the relay webui: http://localdocker:8080  (this on in prog. TODO)
-
-# To see relay.mesos in action, navigate your browser to:
-#     http://localdocker:8080  # relay.mesos
-#     http://localdocker:5050  # mesos
+# Then, add "<IP> docker" to /etc/hosts to make web browsers work
+# ie my boot2docker ip is given by: `boot2docker ip`
+# I added this to my /etc/hosts file:
+#  192.168.59.103 localdocker
 
 # Run this script.  When you run this for the first time, docker may need to
 # download a lot of the required images to get mesos running on your computer
-# ./bin/demo.sh N  # run demo with N mesos slaves  (N=1 is plenty)
+
+# ./bin/demo.sh     # run the demo
+# ./bin/demo.sh N   # run the demo with N mesos slaves  (N=1 is plenty)
 # ./bin/demo.sh -1  # remove all docker containers used in this demo
+
+# To see relay.mesos in action, navigate your browser to:
+#     http://localdocker:8080  # relay UI
+#     http://localdocker:5050  # mesos UI
+
 
 
 dir="$( cd "$( dirname "$( dirname "$0" )" )" && pwd )"
-num_dependent_images=$(expr 2 + ${1:-1})
+num_dependent_images=$(expr 3 + ${1:-1})
 
 if [ "${1:--1}" = "-1" ] || \
   [ "`docker ps|grep relay.mesos |wc -l |tr -d ' '`" != "$num_dependent_images" ]
@@ -89,6 +95,12 @@ then
       # -e MESOS_ISOLATOR=cgroups/cpu,cgroups/mem \
   done
 
+  echo start relay.web
+  docker run -d --name relay.mesos__relay.web \
+    -p 8080:8080 \
+    -p 5673:5673 \
+    adgaudio/relay.web
+
   sleep .5
 
   echo -e "\n"
@@ -104,19 +116,21 @@ then
   fi
 fi
 
-
 docker build -t relay.mesos .
 
 docker run --rm --name relay.mesos \
   --link relay.mesos__zookeeper:zookeeper \
-  -e RELAY_WARMER='for x in `seq 1 1000` ; do echo $x ; done' \
+  --link relay.mesos__relay.web:web \
+  -e RELAY_WARMER='dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 5 + 1)'\
+' ; echo my task is running for $dur seconds ; sleep $dur' \
   -e RELAY_METRIC="relay_mesos.for_demo.num_active_mesos_tasks" \
-  -t -i relay.mesos \
-  bash -c \
-  'relay.mesos '\
-' -d .1 --sendstats tcp://192.168.59.3:5498'\
-' -t 60 --task_resources cpus=0.1 mem=1 --lookback 300'\
-' --mesos_master zk://zookeeper:2181/mesos'
+  -e RELAY_TARGET='oscillating_setpoint' \
+  -e RELAY_SENDSTATS='tcp://web:5673' \
+  -e RELAY_TASK_RESOURCES='cpus=0.1 mem=1' \
+  -e RELAY_MESOS_MASTER='zk://zookeeper:2181/mesos' \
+  -e RELAY_MAX_FAILURES=10 \
+  -e RELAY_DELAY=0.1 \
+  -t -i relay.mesos
 
 
 # helpful
