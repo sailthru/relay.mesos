@@ -1,4 +1,3 @@
-- get demo running properly using docker?
 - have a development docker container that loads python code in a volume
 - add README
 - demo:

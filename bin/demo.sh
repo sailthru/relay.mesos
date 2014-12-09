@@ -109,7 +109,7 @@ docker build -t relay.mesos .
 
 docker run --rm --name relay.mesos \
   --link relay.mesos__zookeeper:zookeeper \
-  -e RELAY_WARMER="sleep 3" \
+  -e RELAY_WARMER='for x in `seq 1 1000` ; do echo $x ; done' \
   -e RELAY_METRIC="relay_mesos.for_demo.num_active_mesos_tasks" \
   -t -i relay.mesos \
   bash -c \
