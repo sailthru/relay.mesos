@@ -3,3 +3,6 @@
 - demo:
   - make metric func that tracks num tasks in mesos hook into demo.sh
   - add the relay web ui  (maybe by pushing a public docker image)
+
+- how does relay.mesos perform if the resource offers only support lots of
+  small tasks but relay requests are occassional large spikes of tasks?
