@@ -116,7 +116,7 @@ then
   fi
 fi
 
-docker build -t relay.mesos .
+(cd $dir ; docker build -t relay.mesos .)
 
 docker run --rm --name relay.mesos \
   --link relay.mesos__zookeeper:zookeeper \
