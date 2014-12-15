@@ -84,9 +84,10 @@ def main(ns):
     relay.start()  # start relay's loop
 
     def kill_children(signal, frame):
-        log.error('Received a signal that is trying to terminate this process.'
-                  ' Terminating mesos and relay child processes!', extra=dict(
-                  signal=signal))
+        log.error(
+            'Received a signal that is trying to terminate this process.'
+            ' Terminating mesos and relay child processes!', extra=dict(
+                signal=signal))
         try:
             mesos.terminate()
             log.info('terminated mesos scheduler')
@@ -102,7 +103,7 @@ def main(ns):
     signal.signal(signal.SIGINT, kill_children)
     while True:
         if exception_receiver.poll():
-            err = exception_receiver.recv()
+            exception_receiver.recv()
             relay.is_alive()
             log.error(
                 'Terminating child processes because one of them raised'
