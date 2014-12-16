@@ -1,5 +1,6 @@
-import urllib2
 import json
+import os
+import urllib2
 
 
 def num_active_mesos_tasks():
@@ -9,7 +10,7 @@ def num_active_mesos_tasks():
     """
     while True:
         data = json.load(urllib2.urlopen(
-            'http://localdocker:5050/master/state.json'))
+            os.environ['RELAY_MESOS_MASTER_STATE_FOR_DEMO']))
         yield data['started_tasks'] + data['staged_tasks'] - (
             data['failed_tasks'] + data['killed_tasks']
             + data['lost_tasks'] + data['finished_tasks'])

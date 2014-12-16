@@ -130,6 +130,7 @@ docker run --rm --name relay.mesos \
   -e RELAY_MESOS_MASTER='zk://zookeeper:2181/mesos' \
   -e RELAY_MAX_FAILURES=10 \
   -e RELAY_DELAY=0.1 \
+  -e RELAY_MESOS_MASTER_STATE_FOR_DEMO='http://localdocker:5050/master/state.json' \
   -t -i relay.mesos
 
 
