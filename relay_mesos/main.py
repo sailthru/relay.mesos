@@ -184,7 +184,7 @@ build_arg_parser = at.build_arg_parser([
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
             default=dict(x.split('=') for x in os.getenv(
-                'RELAY_TASK_RESOURCES', '').split(' ')), help=(
+                'RELAY_TASK_RESOURCES', '=').split(' ')), help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource"
                 "  ie: --task_resources cpus=10 mem=30000"
