@@ -12,10 +12,11 @@ setup(
     description=(
         'A plugin for Relay that lets you run Relay on Mesos to'
         ' auto-scale the number of concurrently running instances'
-        ' of a bash command to minimize the difference between a'
+        ' of a bash command.  Generally, Relay lets you minimize the'
+        ' difference between a'
         ' metric and a target timeseries.'
-        ' Generally good for auto-scaling workers.  Similar to Marathon,'
-        ' but designed for applications that fail often or need to be'
+        ' \n\nGenerally good for auto-scaling workers.  Similar to Marathon,'
+        ' but designed for applications that exit often or need to be'
         " auto-scaled using Relay's algorithm"
     ),
     long_description="Check the project homepage for details",
