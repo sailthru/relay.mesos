@@ -1,4 +1,5 @@
 from __future__ import division
+import os
 import random
 import sys
 
@@ -151,7 +152,8 @@ def _create_task(tid, offer, task_resources, command, docker_image):
     task.task_id.value = tid
     task.slave_id.value = offer.slave_id.value
     task.name = "task %s" % tid
-    task.command.value = command
+    # ability to inject os.environ values into the command
+    task.command.value = command.format(**os.environ)
     if docker_image:
         task.container.docker.image = docker_image
         task.container.type = task.container.DOCKER
