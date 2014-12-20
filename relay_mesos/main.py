@@ -147,7 +147,7 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     # build framework
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
-    framework.name = "Relay.Mesos Framework"
+    framework.name = "Relay.Mesos: %s" % ns.mesos_framework_name
     framework.principal = "test-framework-python"  # TODO: what is this?
 
     # build driver
@@ -181,6 +181,10 @@ build_arg_parser = at.build_arg_parser([
             '--mesos_master', default=os.getenv('RELAY_MESOS_MASTER'),
             help="URI to mesos master. We support whatever mesos supports"
         ),
+        at.add_argument(
+            '--mesos_framework_name',
+            default=os.getenv('RELAY_MESOS_FRAMEWORK_NAME', 'framework'),
+            help="Name the framework so you can identify it in the Mesos UI"),
         at.add_argument(
             '--task_resources', type=lambda x: x.split('='), nargs='*',
             default=dict(x.split('=') for x in os.getenv(
