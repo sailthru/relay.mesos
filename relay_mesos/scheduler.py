@@ -289,6 +289,7 @@ class Scheduler(mesos.interface.Scheduler):
             driver=driver, task_resources=dict(self.ns.task_resources),
             command=command, docker_image=self.ns.docker_image
         )
+        driver.reviveOffers()
         # TODO: send back to relay?  relay would need to support it
         # If relay overreacts to missing resources of framework rate limiting,
         # we could potentially have relay hide from its history the tasks that
@@ -325,3 +326,16 @@ class Scheduler(mesos.interface.Scheduler):
         reschedule any tasks launched on this slave on a new slave.
         """
         pass  # Relay will recover
+
+    def offerRescinded(self, driver, offerId):
+        """
+        Invoked when the status of a task has changed (e.g., a slave is
+        lost and so the task is lost, a task finishes and an executor
+        sends a status update saying so, etc). Note that returning from
+        this callback _acknowledges_ receipt of this status update! If
+        for whatever reason the scheduler aborts during this callback (or
+        the process exits) another status update will be delivered (note,
+        however, that this is currently not true if the slave sending the
+        status update is lost/fails during that time).
+        """
+        log.debug('offer rescinded', extra=dict(offer_id=offerId.value))
