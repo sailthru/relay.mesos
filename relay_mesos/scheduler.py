@@ -93,7 +93,7 @@ def calc_tasks_per_offer(offer, task_resources):
 
 
 def create_tasks(MV, available_offers, driver, task_resources,
-                 command, docker_image):
+                 command, docker_image, ns):
     """
     Launch up to `MV` mesos tasks, depending on availability of mesos
     resources.
@@ -125,16 +125,17 @@ def create_tasks(MV, available_offers, driver, task_resources,
             tid = "%s.%s.%s" % (
                 ID, offer.id.value, random.randint(1, sys.maxint))
             log.debug(
-                "Accepting offer to start a task",
-                extra=dict(offer_host=offer.hostname, task_id=tid))
+                "Accepting offer to start a task", extra=dict(
+                    offer_host=offer.hostname, task_id=tid,
+                    mesos_framework_name=ns.mesos_framework_name))
             task = _create_task(
-                tid, offer, task_resources, command, docker_image)
+                tid, offer, task_resources, command, docker_image, ns)
             tasks.append(task)
         driver.launchTasks(offer.id, tasks)
     return n_fulfilled
 
 
-def _create_task(tid, offer, task_resources, command, docker_image):
+def _create_task(tid, offer, task_resources, command, docker_image, ns):
     """
     `tid` (str) task id
     `offer` a mesos Offer instance
@@ -189,7 +190,9 @@ def _create_task(tid, offer, task_resources, command, docker_image):
     unrecognized_keys = set(task_resources).difference(seen)
     if unrecognized_keys:
         msg = "Unrecognized keys in task_resources!"
-        log.error(msg, extra=dict(unrecognized_keys=unrecognized_keys))
+        log.error(msg, extra=dict(
+            unrecognized_keys=unrecognized_keys,
+            mesos_framework_name=ns.mesos_framework_name))
         raise UserWarning(
             "%s unrecognized_keys: %s" % (msg, unrecognized_keys))
     return task
@@ -225,14 +228,16 @@ class Scheduler(mesos.interface.Scheduler):
                 framework_id=frameworkId.value, master_pid=masterInfo.pid,
                 master_hostname=masterInfo.hostname, master_id=masterInfo.id,
                 master_ip=masterInfo.ip, master_port=masterInfo.port,
+                mesos_framework_name=self.ns.mesos_framework_name,
             ))
 
-    def reregistered(driver, masterInfo):
+    def reregistered(self, driver, masterInfo):
         log.info(
             "Re-registered with master", extra=dict(
                 master_pid=masterInfo.pid,
                 master_hostname=masterInfo.hostname, master_id=masterInfo.id,
                 master_ip=masterInfo.ip, master_port=masterInfo.port,
+                mesos_framework_name=self.ns.mesos_framework_name,
             ))
 
     def resourceOffers(self, driver, offers):
@@ -254,25 +259,32 @@ class Scheduler(mesos.interface.Scheduler):
         framework has already launched tasks with those resources then those
         tasks will fail with a TASK_LOST status and a message saying as much).
         """
-        log.debug("Got resource offers", extra=dict(num_offers=len(offers)))
+        log.debug("Got resource offers", extra=dict(
+            num_offers=len(offers),
+            mesos_framework_name=self.ns.mesos_framework_name))
         available_offers, decline_offers = filter_offers(
             offers, dict(self.ns.task_resources))
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:
-            log.debug('None of the mesos offers had enough relevant resources')
+            log.debug(
+                'None of the mesos offers had enough relevant resources',
+                extra=dict(mesos_framework_name=self.ns.mesos_framework_name))
             return
         log.debug(
             'Mesos has offers available', extra=dict(
                 available_offers=len(available_offers),
-                max_runnable_tasks=sum(x[1] for x in available_offers)))
+                max_runnable_tasks=sum(x[1] for x in available_offers),
+                mesos_framework_name=self.ns.mesos_framework_name))
         # get num tasks I should create from relay.  wait indefinitely.
         with self.MV.get_lock():
             MV = self.MV.value
             self.MV.value = 0
         # create tasks that fulfill relay's requests or return
         if MV == 0:
-            log.debug('mesos scheduler has received no requests from relay')
+            log.debug(
+                'mesos scheduler has received no requests from relay',
+                extra=dict(mesos_framework_name=self.ns.mesos_framework_name))
             for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
             return
@@ -287,7 +299,7 @@ class Scheduler(mesos.interface.Scheduler):
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
             driver=driver, task_resources=dict(self.ns.task_resources),
-            command=command, docker_image=self.ns.docker_image
+            command=command, docker_image=self.ns.docker_image, ns=self.ns
         )
         driver.reviveOffers()
         # TODO: send back to relay?  relay would need to support it
@@ -301,9 +313,10 @@ class Scheduler(mesos.interface.Scheduler):
         catch(self._statusUpdate, self.exception_sender)(driver, update)
 
     def _statusUpdate(self, driver, update):
-        log.debug('task status update: %s' % str(update.message), extra={
-            'task_id': update.task_id.value, 'state': update.state,
-            'slave_id': update.slave_id.value, 'timestamp': update.timestamp})
+        log.debug('task status update: %s' % str(update.message), extra=dict(
+            task_id=update.task_id.value, state=update.state,
+            slave_id=update.slave_id.value, timestamp=update.timestamp,
+            mesos_framework_name=self.ns.mesos_framework_name))
         if self.ns.max_failures == -1:
             return  # don't quit even if you are getting failures
 
@@ -314,8 +327,9 @@ class Scheduler(mesos.interface.Scheduler):
             self.failures = max(self.failures - 1, 0)
         if self.failures >= self.ns.max_failures:
             log.error(
-                "Max allowable number of failures reached",
-                extra=dict(max_failures=self.failures))
+                "Max allowable number of failures reached", extra=dict(
+                    max_failures=self.failures,
+                    mesos_framework_name=self.ns.mesos_framework_name))
             driver.stop()
             raise MaxFailuresReached(self.failures)
 
@@ -338,4 +352,6 @@ class Scheduler(mesos.interface.Scheduler):
         however, that this is currently not true if the slave sending the
         status update is lost/fails during that time).
         """
-        log.debug('offer rescinded', extra=dict(offer_id=offerId.value))
+        log.debug('offer rescinded', extra=dict(
+            offer_id=offerId.value,
+            mesos_framework_name=self.ns.mesos_framework_name))

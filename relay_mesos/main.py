@@ -11,7 +11,7 @@ from relay_mesos.util import catch
 from relay_mesos.scheduler import Scheduler
 
 
-def warmer_cooler_wrapper(MV):
+def warmer_cooler_wrapper(MV, ns):
     """
     Act as a warmer or cooler function such that, instead of executing code,
     we ask mesos to execute it.
@@ -21,13 +21,48 @@ def warmer_cooler_wrapper(MV):
         # either the warmer or cooler.  Since Relay assumes that the choice of
         # `f` (either a warmer or cooler func) is determined by the sign of n,
         # we can too!
-        log.debug('asking mesos to spawn tasks')
+        log.debug(
+            'asking mesos to spawn tasks',
+            extra=dict(mesos_framework_name=ns.mesos_framework_name))
         with MV.get_lock():
             # max MV since tasks last run on mesos
             if abs(MV.value) < abs(n):
                 MV.value = n
-        log.debug('...finished asking mesos to spawn tasks')
+        log.debug(
+            '...finished asking mesos to spawn tasks',
+            extra=dict(mesos_framework_name=ns.mesos_framework_name))
     return _warmer_cooler_wrapper
+
+
+def set_signals(mesos, relay, ns):
+    """Kill child processes on sigint or sigterm"""
+    def kill_children(signal, frame):
+        log.error(
+            'Received a signal that is trying to terminate this process.'
+            ' Terminating mesos and relay child processes!', extra=dict(
+                mesos_framework_name=ns.mesos_framework_name,
+                signal=signal))
+        try:
+            mesos.terminate()
+            log.info(
+                'terminated mesos scheduler',
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
+        except:
+            log.exception(
+                'could not terminate mesos scheduler',
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
+        try:
+            relay.terminate()
+            log.info(
+                'terminated relay',
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
+        except:
+            log.exception(
+                'could not terminate relay',
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
+        sys.exit(1)
+    signal.signal(signal.SIGTERM, kill_children)
+    signal.signal(signal.SIGINT, kill_children)
 
 
 def main(ns):
@@ -44,7 +79,9 @@ def main(ns):
     request is fulfilled at moment enough mesos resources are available.
     """
     if ns.mesos_master is None:
-        log.error("Oops!  You didn't define --mesos_master")
+        log.error(
+            "Oops!  You didn't define --mesos_master",
+            extra=dict(mesos_framework_name=ns.mesos_framework_name))
         build_arg_parser().print_usage()
         sys.exit(1)
     log.info(
@@ -65,9 +102,9 @@ def main(ns):
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
     if ns.warmer:
-        ns_relay.warmer = warmer_cooler_wrapper(MV)
+        ns_relay.warmer = warmer_cooler_wrapper(MV, ns)
     if ns.cooler:
-        ns_relay.cooler = warmer_cooler_wrapper(MV)
+        ns_relay.cooler = warmer_cooler_wrapper(MV, ns)
 
     mesos_name = "Relay.Mesos Scheduler"
     mesos = mp.Process(
@@ -78,56 +115,48 @@ def main(ns):
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
         target=catch(init_relay, exception_sender),
-        args=(ns_relay, mesos_ready),
+        args=(ns_relay, mesos_ready, ns.mesos_framework_name),
         name=relay_name)
     mesos.start()  # start mesos framework
     relay.start()  # start relay's loop
+    set_signals(mesos, relay, ns)
 
-    def kill_children(signal, frame):
-        log.error(
-            'Received a signal that is trying to terminate this process.'
-            ' Terminating mesos and relay child processes!', extra=dict(
-                signal=signal))
-        try:
-            mesos.terminate()
-            log.info('terminated mesos scheduler')
-        except:
-            log.exception('could not terminate mesos scheduler')
-        try:
-            relay.terminate()
-            log.info('terminated relay')
-        except:
-            log.exception('could not terminate relay')
-        sys.exit(1)
-    signal.signal(signal.SIGTERM, kill_children)
-    signal.signal(signal.SIGINT, kill_children)
     while True:
         if exception_receiver.poll():
             exception_receiver.recv()
             relay.is_alive()
             log.error(
                 'Terminating child processes because one of them raised'
-                ' an exception', extra=dict(was_it_relay=not relay.is_alive(),
-                                            was_it_mesos=not mesos.is_alive()))
+                ' an exception', extra=dict(
+                    was_it_relay=not relay.is_alive(),
+                    was_it_mesos=not mesos.is_alive(),
+                    mesos_framework_name=ns.mesos_framework_name))
             break
         if not relay.is_alive():
-            log.error("Relay died.  Check logs to see why.")
+            log.error(
+                "Relay died.  Check logs to see why.",
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
             break
         if not mesos.is_alive():
             log.error(
                 "Mesos Scheduler died and didn't notify me of its exception."
-                "  This may be a code bug.  Check logs.")
+                "  This may be a code bug.  Check logs.",
+                extra=dict(mesos_framework_name=ns.mesos_framework_name))
             break
     relay.terminate()
     mesos.terminate()
     sys.exit(1)
 
 
-def init_relay(ns_relay, mesos_ready):
-    log.debug('Relay waiting to start until mesos framework is registered')
+def init_relay(ns_relay, mesos_ready, mesos_framework_name):
+    log.debug(
+        'Relay waiting to start until mesos framework is registered',
+        extra=dict(mesos_framework_name=mesos_framework_name))
     mesos_ready.acquire()
     mesos_ready.wait()
-    log.debug('Relay notified that mesos framework is registered')
+    log.debug(
+        'Relay notified that mesos framework is registered',
+        extra=dict(mesos_framework_name=mesos_framework_name))
     relay_main(ns_relay)
 
 
@@ -139,10 +168,13 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     except ImportError:
         log.error(
             "Oops! Mesos native bindings are not installed.  You can download"
-            " these binaries from mesosphere.")
+            " these binaries from mesosphere.",
+            extra=dict(mesos_framework_name=ns.mesos_framework_name))
         raise
 
-    log.info('starting mesos scheduler')
+    log.info(
+        'starting mesos scheduler',
+        extra=dict(mesos_framework_name=ns.mesos_framework_name))
 
     # build framework
     framework = mesos_pb2.FrameworkInfo()
