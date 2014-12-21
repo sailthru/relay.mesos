@@ -290,6 +290,9 @@ class Scheduler(mesos.interface.Scheduler):
             command=command, docker_image=self.ns.docker_image
         )
         # TODO: send back to relay?  relay would need to support it
+        # If relay overreacts to missing resources of framework rate limiting,
+        # we could potentially have relay hide from its history the tasks that
+        # couldn't be filled due to mesos resource constraints
         # n_fulfilled = create_tasks(...)
         # self.relay_channel.send_pyobj(n_fulfilled)
 
