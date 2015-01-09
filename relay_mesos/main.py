@@ -124,12 +124,11 @@ def main(ns):
     while True:
         if exception_receiver.poll():
             exception_receiver.recv()
-            relay.is_alive()
             log.error(
                 'Terminating child processes because one of them raised'
                 ' an exception', extra=dict(
-                    was_it_relay=not relay.is_alive(),
-                    was_it_mesos=not mesos.is_alive(),
+                    is_relay_alive=relay.is_alive(),
+                    is_mesos_alive=mesos.is_alive(),
                     mesos_framework_name=ns.mesos_framework_name))
             break
         if not relay.is_alive():
