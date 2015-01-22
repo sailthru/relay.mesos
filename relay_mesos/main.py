@@ -3,6 +3,7 @@ import multiprocessing as mp
 import os
 import signal
 import sys
+import time
 
 from relay import argparse_shared as at
 from relay.runner import main as relay_main, build_arg_parser as relay_ap
@@ -142,6 +143,12 @@ def main(ns):
                 "  This may be a code bug.  Check logs.",
                 extra=dict(mesos_framework_name=ns.mesos_framework_name))
             break
+        # save cpu cycles by checking for subprocess failures less often
+        if ns.delay > 5:
+            time.sleep(5)
+        else:
+            time.sleep(ns.delay)
+
     relay.terminate()
     mesos.terminate()
     sys.exit(1)
