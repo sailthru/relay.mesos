@@ -314,7 +314,7 @@ class Scheduler(mesos.interface.Scheduler):
 
     def _statusUpdate(self, driver, update):
         log.debug('task status update: %s' % str(update.message), extra=dict(
-            task_id=update.task_id.value, state=update.state,
+            task_id=update.task_id.value, task_state=update.state,
             slave_id=update.slave_id.value, timestamp=update.timestamp,
             mesos_framework_name=self.ns.mesos_framework_name))
         if self.ns.max_failures == -1:
