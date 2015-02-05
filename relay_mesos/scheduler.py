@@ -152,7 +152,10 @@ def _create_task(tid, offer, task_resources, command, docker_image, ns):
     task = mesos_pb2.TaskInfo()
     task.task_id.value = tid
     task.slave_id.value = offer.slave_id.value
-    task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
+    if ns.mesos_framework_name:
+        task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
+    else:
+        task.name = "relay.mesos task: %s" % tid
     # ability to inject os.environ values into the command
     task.command.value = command.format(**os.environ)
     if docker_image:

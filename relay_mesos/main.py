@@ -186,7 +186,8 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
     framework.name = "Relay.Mesos: %s" % ns.mesos_framework_name
-    framework.principal = ns.mesos_framework_principal
+    if ns.mesos_framework_principal:
+        framework.principal = ns.mesos_framework_principal
     if ns.mesos_framework_role:
         framework.role = ns.mesos_framework_role
 
