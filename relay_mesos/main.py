@@ -186,7 +186,9 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
     framework.name = "Relay.Mesos: %s" % ns.mesos_framework_name
-    framework.principal = ns.mesos_principal
+    framework.principal = ns.mesos_framework_principal
+    if ns.mesos_framework_role:
+        framework.role = ns.mesos_framework_role
 
     # build driver
     driver = mesos.native.MesosSchedulerDriver(
@@ -220,10 +222,18 @@ build_arg_parser = at.build_arg_parser([
             help="URI to mesos master. We support whatever mesos supports"
         ),
         at.add_argument(
-            '--mesos_principal', default=os.getenv('RELAY_MESOS_PRINCIPAL'),
+            '--mesos_framework_principal',
+            default=os.getenv('RELAY_MESOS_FRAMEWORK_PRINCIPAL'),
             type=str, help=(
                 "If you use Mesos Framework Rate Limiting, this framework's"
                 " principal identifies which rate limiting policy to apply")),
+        at.add_argument(
+            '--mesos_framework_role',
+            default=os.getenv('RELAY_MESOS_FRAMEWORK_ROLE'),
+            type=str, help=(
+                "If you use Mesos Access Control Lists (ACLs) or apply"
+                " weighting to frameworks, your framework needs to register"
+                " with a role.")),
         at.add_argument(
             '--mesos_framework_name',
             default=os.getenv('RELAY_MESOS_FRAMEWORK_NAME', 'framework'),
