@@ -279,23 +279,9 @@ class Scheduler(mesos.interface.Scheduler):
                 available_offers=len(available_offers),
                 max_runnable_tasks=sum(x[1] for x in available_offers),
                 mesos_framework_name=self.ns.mesos_framework_name))
-        # get num tasks I should create from relay.  wait indefinitely.
-        with self.MV.get_lock():
-            MV = self.MV.value
-            self.MV.value = 0
-        # create tasks that fulfill relay's requests or return
-        if MV == 0:
-            log.debug(
-                'mesos scheduler has received no requests from relay',
-                extra=dict(mesos_framework_name=self.ns.mesos_framework_name))
-            for offer, _ in available_offers:
-                driver.declineOffer(offer.id)
-            return
-        elif MV > 0 and self.ns.warmer:
-            command = self.ns.warmer
-        elif MV < 0 and self.ns.cooler:
-            command = self.ns.cooler
-        else:
+        MV, command = self._get_and_update_relay(available_offers)
+
+        if command is None:
             for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
             return
@@ -305,12 +291,36 @@ class Scheduler(mesos.interface.Scheduler):
             command=command, docker_image=self.ns.docker_image, ns=self.ns
         )
         driver.reviveOffers()
-        # TODO: send back to relay?  relay would need to support it
-        # If relay overreacts to missing resources of framework rate limiting,
-        # we could potentially have relay hide from its history the tasks that
-        # couldn't be filled due to mesos resource constraints
-        # n_fulfilled = create_tasks(...)
-        # self.relay_channel.send_pyobj(n_fulfilled)
+
+    def _get_and_update_relay(self, available_offers):
+        """
+        Get num tasks I should create and evaluate whether to use Relay's
+        warmer or cooler command.  Update the MV with number of commands about
+        to be created.
+
+        Competes for the MV with these other threads, and will wait
+        indefinitely for it:
+
+          - other Mesos resourceOffers(...) calls to the Framework scheduler
+          - Relay warmer and cooler functions attempting to ask the Framework to
+            execute more tasks.
+        """
+        with self.MV.get_lock():
+            MV = self.MV.value
+            # create tasks that fulfill relay's requests or return
+            if MV == 0:
+                log.debug(
+                    'mesos scheduler has received no requests from relay',
+                    extra=dict(
+                        mesos_framework_name=self.ns.mesos_framework_name))
+                command = None
+            else:
+                if MV > 0 and self.ns.warmer:
+                    command = self.ns.warmer
+                elif MV < 0 and self.ns.cooler:
+                    command = self.ns.cooler
+                self.MV.value = MV - (MV > 0 or -1) * len(available_offers)
+        return (MV, command)
 
     def statusUpdate(self, driver, update):
         catch(self._statusUpdate, self.exception_sender)(driver, update)

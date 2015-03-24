@@ -27,8 +27,9 @@ def warmer_cooler_wrapper(MV, ns):
             extra=dict(mesos_framework_name=ns.mesos_framework_name))
         with MV.get_lock():
             # max MV since tasks last run on mesos
-            if abs(MV.value) < abs(n):
-                MV.value = n
+            # if abs(MV.value) < abs(n):
+                # MV.value = n
+            MV.value = n
         log.debug(
             '...finished asking mesos to spawn tasks',
             extra=dict(mesos_framework_name=ns.mesos_framework_name))
