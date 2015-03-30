@@ -305,6 +305,7 @@ class Scheduler(mesos.interface.Scheduler):
           - Relay warmer and cooler functions attempting to ask the Framework to
             execute more tasks.
         """
+        command = None
         with self.MV.get_lock():
             MV = self.MV.value
             # create tasks that fulfill relay's requests or return
@@ -313,7 +314,6 @@ class Scheduler(mesos.interface.Scheduler):
                     'mesos scheduler has received no requests from relay',
                     extra=dict(
                         mesos_framework_name=self.ns.mesos_framework_name))
-                command = None
             else:
                 if MV > 0 and self.ns.warmer:
                     command = self.ns.warmer
