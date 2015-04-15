@@ -319,7 +319,10 @@ class Scheduler(mesos.interface.Scheduler):
                     command = self.ns.warmer
                 elif MV < 0 and self.ns.cooler:
                     command = self.ns.cooler
-                self.MV.value = MV - (MV > 0 or -1) * len(available_offers)
+                if abs(MV) < len(available_offers):
+                    self.MV.value = 0
+                else:
+                    self.MV.value = MV - (MV > 0 or -1) * len(available_offers)
         return (MV, command)
 
     def statusUpdate(self, driver, update):
