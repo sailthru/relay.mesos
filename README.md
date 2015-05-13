@@ -3,7 +3,9 @@ Relay.Mesos:  Run Relay and Mesos
 
 In short, Relay.Mesos runs Relay as a Mesos framework.  By combining
 both of these tools, we can solve control loop problems that arise in
-distributed systems.
+distributed systems.  An example problem Relay.Mesos might solve is to
+spin up queue consumers to maintain a stable queue size.  You could also
+use Relay.Mesos to maintain a constant CPU usage on your mesos cluster.
 
 What is Relay?
 ----------
