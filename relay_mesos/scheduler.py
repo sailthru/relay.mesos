@@ -92,8 +92,7 @@ def calc_tasks_per_offer(offer, task_resources):
         return num_tasks
 
 
-def create_tasks(MV, available_offers, driver, task_resources,
-                 command, docker_image, ns):
+def create_tasks(MV, available_offers, driver, command, ns):
     """
     Launch up to `MV` mesos tasks, depending on availability of mesos
     resources.
@@ -101,15 +100,6 @@ def create_tasks(MV, available_offers, driver, task_resources,
     `MV` max number of mesos tasks to spin up.  Relay chooses this number
     `available_offers` a dict of mesos offers and num tasks they can support
     `driver` a mesos driver instance
-    `task_resources` the stuff a task would consume:
-        {
-            "cpus": 10,
-            "mem": 1,
-            "disk": 12,
-            "ports": [(20, 34), (35, 35)],
-            "disks": ["sda1"]
-        }
-    `docker_image` (str|None) a docker image you wish to execute the command in
     """
     n_fulfilled = 0
     for offer, ntasks in available_offers:
@@ -129,17 +119,17 @@ def create_tasks(MV, available_offers, driver, task_resources,
                     offer_host=offer.hostname, task_id=tid,
                     mesos_framework_name=ns.mesos_framework_name))
             task = _create_task(
-                tid, offer, task_resources, command, docker_image, ns)
+                tid, offer, command, ns)
             tasks.append(task)
         driver.launchTasks(offer.id, tasks)
     return n_fulfilled
 
 
-def _create_task(tid, offer, task_resources, command, docker_image, ns):
+def _create_task(tid, offer, command, ns):
     """
     `tid` (str) task id
     `offer` a mesos Offer instance
-    `task_resources` the stuff a task would consume:
+    `ns.task_resources` the stuff a task would consume:
         {
             "cpus": 10,
             "mem": 1,
@@ -147,7 +137,8 @@ def _create_task(tid, offer, task_resources, command, docker_image, ns):
             "ports": [(20, 34), (35, 35)],
             "disks": ["sda1"]
         }
-    `docker_image` (str|None) a docker image you wish to execute the command in
+    `ns.docker_image` (str|None)
+        a docker image you wish to execute the command in
     """
     task = mesos_pb2.TaskInfo()
     task.task_id.value = tid
@@ -158,9 +149,10 @@ def _create_task(tid, offer, task_resources, command, docker_image, ns):
         task.name = "relay.mesos task: %s" % tid
     # ability to inject os.environ values into the command
     task.command.value = command.format(**os.environ)
-    if docker_image:
-        task.container.docker.image = docker_image
+    if ns.docker_image:
+        task.container.docker.image = ns.docker_image
         task.container.type = task.container.DOCKER
+    task_resources = dict(ns.task_resources)
     seen = set()
     for key in set(SCALAR_KEYS).intersection(task_resources):
         seen.add(key)
@@ -287,8 +279,7 @@ class Scheduler(mesos.interface.Scheduler):
             return
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
-            driver=driver, task_resources=dict(self.ns.task_resources),
-            command=command, docker_image=self.ns.docker_image, ns=self.ns
+            driver=driver, command=command, ns=self.ns
         )
         driver.reviveOffers()
 
