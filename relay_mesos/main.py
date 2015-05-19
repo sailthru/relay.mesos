@@ -246,13 +246,23 @@ build_arg_parser = at.build_arg_parser([
                 'RELAY_MESOS_TASK_RESOURCES', '=').split(' ')), help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource"
-                "  ie: --task_resources cpus=10 mem=30000"
+                "  ie: --mesos_task_resources cpus=10 mem=30000"
             )),
         at.add_argument(
             '--docker_image',
             default=os.getenv('RELAY_MESOS_DOCKER_IMAGE'), help=(
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
+        at.add_argument(
+            '--volumes', default=os.getenv('RELAY_MESOS_VOLUMES'),
+            type=lambda x: tuple(tuple(y.split(':')) for y in x.split(',')),
+            help=(
+                "If using containers, you may wish to mount volumes into those"
+                " containers.  Define the volumnes you wish to mount as"
+                " a comma-separated list of volumes with the"
+                " following format:"
+                "  --mesos_volumes host_path:container_path:mode,"
+                "host_path2:container_path2:mode,...")),
         at.add_argument(
             '--max_failures', type=int,
             default=os.getenv('RELAY_MESOS_MAX_FAILURES', -1), help=(

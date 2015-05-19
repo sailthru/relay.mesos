@@ -125,34 +125,8 @@ def create_tasks(MV, available_offers, driver, command, ns):
     return n_fulfilled
 
 
-def _create_task(tid, offer, command, ns):
-    """
-    `tid` (str) task id
-    `offer` a mesos Offer instance
-    `ns.task_resources` the stuff a task would consume:
-        {
-            "cpus": 10,
-            "mem": 1,
-            "disk": 12,
-            "ports": [(20, 34), (35, 35)],
-            "disks": ["sda1"]
-        }
-    `ns.docker_image` (str|None)
-        a docker image you wish to execute the command in
-    """
-    task = mesos_pb2.TaskInfo()
-    task.task_id.value = tid
-    task.slave_id.value = offer.slave_id.value
-    if ns.mesos_framework_name:
-        task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
-    else:
-        task.name = "relay.mesos task: %s" % tid
-    # ability to inject os.environ values into the command
-    task.command.value = command.format(**os.environ)
-    if ns.docker_image:
-        task.container.docker.image = ns.docker_image
-        task.container.type = task.container.DOCKER
-    task_resources = dict(ns.task_resources)
+def _create_task_add_task_resources(task, ns):
+    task_resources = dict(ns.mesos_task_resources)
     seen = set()
     for key in set(SCALAR_KEYS).intersection(task_resources):
         seen.add(key)
@@ -182,6 +156,7 @@ def _create_task(tid, offer, command, ns):
         resource.type = mesos_pb2.Value.SET
         for elem in task_resources[key]:
             resource.set.item.append(typecast(elem))
+
     unrecognized_keys = set(task_resources).difference(seen)
     if unrecognized_keys:
         msg = "Unrecognized keys in task_resources!"
@@ -190,6 +165,48 @@ def _create_task(tid, offer, command, ns):
             mesos_framework_name=ns.mesos_framework_name))
         raise UserWarning(
             "%s unrecognized_keys: %s" % (msg, unrecognized_keys))
+
+
+def _create_task(tid, offer, command, ns):
+    """
+    `tid` (str) task id
+    `offer` a mesos Offer instance
+    `ns.mesos_task_resources` the stuff a task would consume:
+        {
+            "cpus": 10,
+            "mem": 1,
+            "disk": 12,
+            "ports": [(20, 34), (35, 35)],
+            "disks": ["sda1"]
+        }
+    `ns.docker_image` (str|None)
+        a docker image you wish to execute the command in
+    `ns.volumes` a list of volumes that get mounted into the container:
+        [
+          ("host_path", "container_path", "mode"),
+          ("/my/directory", "/path/on/container", "ro")
+        ]
+    """
+    task = mesos_pb2.TaskInfo()
+    task.task_id.value = tid
+    task.slave_id.value = offer.slave_id.value
+    if ns.mesos_framework_name:
+        task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
+    else:
+        task.name = "relay.mesos task: %s" % tid
+    # ability to inject os.environ values into the command
+    task.command.value = command.format(**os.environ)
+    if ns.docker_image:
+        task.container.docker.image = ns.docker_image
+        task.container.type = task.container.DOCKER
+    if ns.volumes:
+        for host_path, container_path, mode in ns.volumes:
+            vol = mesos_pb2.Volume()
+            vol.host_path = host_path
+            vol.container_path = container_path
+            vol.mode = mode
+            task.container.volumes.add(vol)
+    _create_task_add_task_resources(task, ns)
     return task
 
 
@@ -258,7 +275,7 @@ class Scheduler(mesos.interface.Scheduler):
             num_offers=len(offers),
             mesos_framework_name=self.ns.mesos_framework_name))
         available_offers, decline_offers = filter_offers(
-            offers, dict(self.ns.task_resources))
+            offers, dict(self.ns.mesos_task_resources))
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:
