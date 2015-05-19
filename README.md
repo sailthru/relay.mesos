@@ -4,8 +4,9 @@ Relay.Mesos:  Run Relay and Mesos
 In short, Relay.Mesos runs Relay as a Mesos framework.  By combining
 both of these tools, we can solve control loop problems that arise in
 distributed systems.  An example problem Relay.Mesos might solve is to
-spin up queue consumers to maintain a stable queue size.  You could also
-use Relay.Mesos to maintain a constant CPU usage on your mesos cluster.
+spin up queue consumers to maintain or minimize a queue size.  You could also
+use Relay.Mesos to set a target CPU usage over time for all instances of
+a particular task running on your mesos cluster.
 
 What is Relay?
 ----------
@@ -27,6 +28,16 @@ which resources are available and then provides ways to use those resources.
 
 [White paper about Mesos (this is good
 reading)](http://mesos.berkeley.edu/mesos_tech_report.pdf)
+
+
+What is Mesos.Mesos?
+----------
+Relay.Mesos will iteratively ask Mesos to run tasks on the cluster.
+These tasks will either eventually increase or eventually decrease some
+measured metric.  Relay.Mesos will quickly learn how the metric changes
+over time and tune itself to ask Mesos to spin up more or less tasks as
+necessary to minimize the difference between the metric and a desired target
+value for that metric.
 
 
 Quickstart
@@ -76,10 +87,11 @@ again, but it will eventually stabilize.
 In Relay.Mesos, as with Relay generally, there are 4 main components:
 metric, target, warmer and cooler.
 
-The ```metric``` and ```target``` are both python generator functions (ie timeseries), that, when called,
-each yield a number.  The ```metric``` is a signal that we're monitoring
-and manipulating.  The ```target``` represents a desired value that
-Relay attempts to make the ```metric``` mirror as closely as possible.
+The ```metric``` and ```target``` are both python generator functions
+(ie timeseries), that, when called, each yield a number.  The
+```metric``` is a signal that we're monitoring and manipulating.  The
+```target``` represents a desired value that Relay attempts to make the
+```metric``` mirror as closely as possible.
 
 The ```warmer``` and ```cooler``` are expected to (eventually) modify
 the metric.  Executing a ```warmer``` will increase the metric.
@@ -90,6 +102,8 @@ your custom docker container, if you wish.
 
 Examples:
 ----------
+
+(See QuickStart for a demo using Docker containers)
 
 Relay.Mesos can ensure that the number of jobs running at any given
 time is enough to consume a queue.
