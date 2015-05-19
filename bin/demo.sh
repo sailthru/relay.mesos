@@ -126,9 +126,9 @@ docker run --rm --name relay.mesos \
   -e RELAY_METRIC="relay_mesos.for_demo.num_active_mesos_tasks" \
   -e RELAY_TARGET='oscillating_setpoint' \
   -e RELAY_SENDSTATS='tcp://web:5673' \
-  -e RELAY_TASK_RESOURCES='cpus=0.1 mem=1' \
+  -e RELAY_MESOS_TASK_RESOURCES='cpus=0.1 mem=1' \
   -e RELAY_MESOS_MASTER='zk://zookeeper:2181/mesos' \
-  -e RELAY_MAX_FAILURES=10 \
+  -e RELAY_MESOS_MAX_FAILURES=10 \
   -e RELAY_DELAY=0.1 \
   -e RELAY_MESOS_MASTER_STATE_FOR_DEMO='http://localdocker:5050/master/state.json' \
   -t -i relay.mesos

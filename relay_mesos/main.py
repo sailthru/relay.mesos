@@ -241,20 +241,21 @@ build_arg_parser = at.build_arg_parser([
             default=os.getenv('RELAY_MESOS_FRAMEWORK_NAME', 'framework'),
             help="Name the framework so you can identify it in the Mesos UI"),
         at.add_argument(
-            '--task_resources', type=lambda x: x.split('='), nargs='*',
+            '--mesos_task_resources', type=lambda x: x.split('='), nargs='*',
             default=dict(x.split('=') for x in os.getenv(
-                'RELAY_TASK_RESOURCES', '=').split(' ')), help=(
+                'RELAY_MESOS_TASK_RESOURCES', '=').split(' ')), help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource"
                 "  ie: --task_resources cpus=10 mem=30000"
             )),
         at.add_argument(
-            '--docker_image', default=os.getenv('RELAY_DOCKER_IMAGE'), help=(
+            '--docker_image',
+            default=os.getenv('RELAY_MESOS_DOCKER_IMAGE'), help=(
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
         at.add_argument(
             '--max_failures', type=int,
-            default=os.getenv('RELAY_MAX_FAILURES', -1), help=(
+            default=os.getenv('RELAY_MESOS_MAX_FAILURES', -1), help=(
                 "If tasks are failing too often, stop the driver and raise"
                 " an error.  If given, this (always positive) number"
                 " is a running count of (failures - successes - starting)"
