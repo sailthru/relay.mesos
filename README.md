@@ -73,15 +73,20 @@ Background
 Relay.Mesos is made up of two primary components: a Mesos framework and
 a Relay event loop.  Relay continuously requests that the mesos
 framework run a number of tasks.  The framework receives resource
-offers from mesos and, if any Relay requests can be fulfilled, it will
-attempt to fulfill them.  If Relay requests can't be fulfilled because
-Mesos cluster is full, then the next time Relay.Mesos receives mesos resource
-offers, it will attempt to fulfill the largest Relay request since
-the last set of mesos resource offers was fulfilled.  In the current
-implementation, if no mesos resource offers are available for a long
-time, this can result in Relay.Mesos building up a history of error.  In
-this case, Relay.Mesos may over-react the moment mesos offers become available
-again, but it will eventually stabilize.
+offers from mesos and, if the most recent Relay request can be fulfilled,
+it will attempt to fulfill it by spinning up "warmer" or "cooler" tasks.
+If Relay requests can't be fulfilled because
+Mesos cluster is at capacity, then Relay will continue to ask to spin up
+tasks, but nothing will happen.
+
+If no mesos resource offers are available for a long time, Relay.Mesos
+will become starved for resources.  This can result in Relay.Mesos
+building up a history of error between the target and the metric.  If
+Relay.Mesos has been starved for Mesos resources for a while, when
+resources become available again, Relay might initially ask for too many
+resources because it's learned that asking for a lot of tasks to spin up
+results in very little or no difference in the metric.  In any case, it
+will quickly re-learn the right thing to do.
 
 In Relay.Mesos, as with Relay generally, there are 4 main components:
 metric, target, warmer and cooler.
@@ -96,7 +101,7 @@ The ```warmer``` and ```cooler``` are expected to (eventually) modify
 the metric.  Executing a ```warmer``` will increase the metric.
 Executing a ```cooler``` will decrease the metric.  In Relay.Mesos, the
 ```warmer``` and ```cooler``` are bash commands.  These may be executed in
-your custom docker container, if you wish.
+your docker containers, if you wish.
 
 
 Examples:
@@ -126,3 +131,29 @@ Relay.Mesos can attempt to maintain a desired amount of cpu usage
     Target = 0
     Cooler = "run a bash command that uses the cpu"
     (Warmer not defined)
+
+
+Configuration Options:
+----------
+
+All configuration options specific to Relay.Mesos are visible when you
+run one of the following commands:
+```
+$ docker-compose run relay relay.mesos -h
+
+# or, if you have relay.mesos installed locally
+
+$ relay.mesos -h
+```
+
+Configuration options can also be passed in via environment variables by
+prefixing env vars.
+
+Relay.Mesos options are prefixed with `RELAY_MESOS`.  For instance:
+
+    RELAY_MESOS_MASTER=zk://zookeeper:2181/mesos
+
+Relay-only options (ie those specificed in "Optional Relay parameters")
+are prefixed with `RELAY`:
+
+    RELAY_DELAY=60

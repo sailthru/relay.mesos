@@ -279,7 +279,9 @@ build_arg_parser = at.build_arg_parser([
             )),
     ),
 ],
-    description="Convert your Relay app into a Mesos Framework",
+    description=(
+        "Use Relay to auto-scale instances of a bash command"
+        " or docker container on Mesos"),
     parents=[relay_ap()], conflict_handler='resolve')
 
 
