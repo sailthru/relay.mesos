@@ -1,3 +1,9 @@
+Relay Web UI:
+![](/screenshot_relay.png?raw=true)
+Mesos Web UI:
+![](/screenshot_mesos.png?raw=true)
+
+
 Relay.Mesos:  Run Relay and Mesos
 ==========
 
@@ -30,7 +36,7 @@ which resources are available and then provides ways to use those resources.
 reading)](http://mesos.berkeley.edu/mesos_tech_report.pdf)
 
 
-What is Mesos.Mesos?
+What is Relay.Mesos?
 ----------
 Relay.Mesos will iteratively ask Mesos to run tasks on the cluster.
 These tasks will either eventually increase or eventually decrease some
