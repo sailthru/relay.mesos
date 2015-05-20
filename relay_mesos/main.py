@@ -1,6 +1,7 @@
 import atexit
 import multiprocessing as mp
 import os
+import random
 import signal
 import sys
 import time
@@ -24,15 +25,18 @@ def warmer_cooler_wrapper(MV, ns):
         # we can too!
         log.debug(
             'asking mesos to spawn tasks',
-            extra=dict(mesos_framework_name=ns.mesos_framework_name, ntasks=n))
+            extra=dict(
+                mesos_framework_name=ns.mesos_framework_name,
+                task_num=n, task_type="warmer" if n > 0 else "cooler"))
+        t = time.time()
         with MV.get_lock():
-            # max MV since tasks last run on mesos
-            # if abs(MV.value) < abs(n):
-                # MV.value = n
-            MV.value = n
+            if MV[1] < t:
+                MV[:] = (n, t)
         log.debug(
             '...finished asking mesos to spawn tasks',
-            extra=dict(mesos_framework_name=ns.mesos_framework_name, ntasks=n))
+            extra=dict(
+                mesos_framework_name=ns.mesos_framework_name,
+                task_num=n, task_type="warmer" if n > 0 else "cooler"))
     return _warmer_cooler_wrapper
 
 
@@ -94,7 +98,7 @@ def main(ns):
     # should create at any given moment in time.
     # Sign of MV determines task type: warmer or cooler
     # ie. A positive value of n means n warmer tasks
-    MV = mp.Value('l')  # max_val is a ctypes.c_int64
+    MV = mp.Array('d', [0, 0])  # max_val is a ctypes.c_int64
 
     # store exceptions that may be raised
     exception_receiver, exception_sender = mp.Pipe(False)

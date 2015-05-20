@@ -1,6 +1,7 @@
 from __future__ import division
 import os
 import random
+import time
 import sys
 
 import mesos.interface
@@ -315,7 +316,7 @@ class Scheduler(mesos.interface.Scheduler):
         """
         command = None
         with self.MV.get_lock():
-            MV = self.MV.value
+            MV, t = self.MV
             # create tasks that fulfill relay's requests or return
             if MV == 0:
                 log.debug(
@@ -328,9 +329,10 @@ class Scheduler(mesos.interface.Scheduler):
                 elif MV < 0 and self.ns.cooler:
                     command = self.ns.cooler
                 if abs(MV) < len(available_offers):
-                    self.MV.value = 0
+                    self.MV[:] = [0, time.time()]
                 else:
-                    self.MV.value = MV - (MV > 0 or -1) * len(available_offers)
+                    new_MV = MV - (MV > 0 or -1) * len(available_offers)
+                    self.MV[:] = [new_MV, time.time()]
         return (MV, command)
 
     def statusUpdate(self, driver, update):
