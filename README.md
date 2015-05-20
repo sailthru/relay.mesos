@@ -41,9 +41,8 @@ What is Relay.Mesos?
 Relay.Mesos will iteratively ask Mesos to run tasks on the cluster.
 These tasks will either eventually increase or eventually decrease some
 measured metric.  Relay.Mesos will quickly learn how the metric changes
-over time and tune itself to ask Mesos to spin up more or less tasks as
-necessary to minimize the difference between the metric and a desired target
-value for that metric.
+over time and tune its requests to Mesos so it can minimize the difference
+between the metric and a desired target value for that metric.
 
 
 Quickstart
@@ -54,24 +53,18 @@ Quickstart
     - (if on a mac, you may need boot2docker and don't forget to add env vars to your .profile)
     - (if on ubuntu, you may need 3.16 kernel or later)
 
-1. Identify docker in /etc/hosts to make web browsers work:
+1. Identify docker in /etc/hosts
 
-        # my boot2docker ip is given by: `boot2docker ip` or $DOCKER_HOST
         # I added this to my /etc/hosts file:
-            192.168.59.103 localdocker
+        #    192.168.59.103 localdocker
+        # If you use boot2docker, this should work:
+        # $ echo "$(boot2docker ip) localdocker" | sudo tee -a /etc/hosts
 
 1. Run the demo script.
     - When you run this for the first time, docker may need to download a
       lot of the required images to get mesos running on your computer
 
             # ./bin/demo.sh     # run the demo
-            # ./bin/demo.sh N   # run the demo with N mesos slaves  (N=1 is plenty)
-            # ./bin/demo.sh -1  # remove all docker containers used in this demo
-
-1. To see relay.mesos in action, navigate your browser to:
-
-        http://localdocker:8080  # relay UI
-        http://localdocker:5050  # mesos UI
 
 
 Background
