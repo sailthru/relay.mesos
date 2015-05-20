@@ -331,7 +331,8 @@ class Scheduler(mesos.interface.Scheduler):
                 if abs(MV) < len(available_offers):
                     self.MV[:] = [0, time.time()]
                 else:
-                    new_MV = MV - (MV > 0 or -1) * len(available_offers)
+                    new_MV = MV - (MV > 0 or -1) * max(abs(MV),
+                                                       len(available_offers))
                     self.MV[:] = [new_MV, time.time()]
         return (MV, command)
 
