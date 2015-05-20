@@ -64,8 +64,9 @@ relay:
     - web
     - master
   environment:
-    RELAY_WARMER: "dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 5 + 1) ; echo my task is running for $dur seconds ; sleep $dur"
+    RELAY_WARMER: "dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 10 + 5) ; echo my task is running for $dur seconds ; sleep $dur"
     RELAY_METRIC: "relay_mesos.for_demo.num_active_mesos_tasks"
+    # RELAY_TARGET: "relay_mesos.for_demo.target_value"
     RELAY_TARGET: "oscillating_setpoint"
     RELAY_SENDSTATS: "tcp://web:5673"
     RELAY_MESOS_TASK_RESOURCES: "cpus=0.1 mem=1"

@@ -24,6 +24,7 @@
 #     http://localdocker:8080  # relay UI
 #     http://localdocker:5050  # mesos UI
 
+docker-compose build relay
 
 (
 echo sleeping 10 seconds and then opening two browser tabs
