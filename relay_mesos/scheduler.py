@@ -311,8 +311,8 @@ class Scheduler(mesos.interface.Scheduler):
         indefinitely for it:
 
           - other Mesos resourceOffers(...) calls to the Framework scheduler
-          - Relay warmer and cooler functions attempting to ask the Framework to
-            execute more tasks.
+          - Relay warmer and cooler functions attempting to ask the Framework
+            to execute more tasks.
         """
         command = None
         with self.MV.get_lock():

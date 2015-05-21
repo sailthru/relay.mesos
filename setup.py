@@ -40,7 +40,7 @@ setup(
     tests_require=['nose'],
     test_suite="nose.main",
 
-    entry_points = {
+    entry_points={
         'console_scripts': [
             'relay.mesos = relay_mesos.__main__:go',
         ],

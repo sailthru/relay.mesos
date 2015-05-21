@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+set -u
+
+ROOT="$( dirname "$( cd "$( dirname "$0" )" && pwd )")"
+echo linting code in $ROOT
+(
+cd $ROOT
+pep8 . --exclude=.ropeproject --ignore=E402
+find . -name "*py" | xargs pyflakes
+)
+echo 'yay! clean code!'
