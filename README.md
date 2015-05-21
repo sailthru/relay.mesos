@@ -146,14 +146,12 @@ $ docker-compose run relay relay.mesos -h
 $ relay.mesos -h
 ```
 
-Configuration options can also be passed in via environment variables by
-prefixing env vars.
+Configuration options can also be passed in via environment variables
 
 Relay.Mesos options are prefixed with `RELAY_MESOS`.  For instance:
 
     RELAY_MESOS_MASTER=zk://zookeeper:2181/mesos
 
-Relay-only options (ie those specificed in "Optional Relay parameters")
-are prefixed with `RELAY`:
+Relay-only options (ie those that start with "RELAY_"):
 
     RELAY_DELAY=60

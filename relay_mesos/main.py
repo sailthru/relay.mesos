@@ -1,7 +1,5 @@
 import atexit
 import multiprocessing as mp
-import os
-import random
 import signal
 import sys
 import time
@@ -211,6 +209,13 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     sys.exit(status)
 
 
+# This add_argument func will prefix env vars with RELAY_MESOS.
+# The normal at.add_argument func prefixes env vars with RELAY_
+# Let's use the at.add_argument func for --mesos_XXX and the below for --XXX
+add_argument = at.add_argument_default_from_env_factory(
+    env_prefix='RELAY_MESOS_')
+
+
 build_arg_parser = at.build_arg_parser([
     at.group(
         "How does Relay.mesos affect your metric?",
@@ -224,41 +229,39 @@ build_arg_parser = at.build_arg_parser([
     at.group(
         "Relay.Mesos parameters",
         at.add_argument(
-            '--mesos_master', default=os.getenv('RELAY_MESOS_MASTER'),
+            '--mesos_master',
             help="URI to mesos master. We support whatever mesos supports"
         ),
         at.add_argument(
             '--mesos_framework_principal',
-            default=os.getenv('RELAY_MESOS_FRAMEWORK_PRINCIPAL'),
             type=str, help=(
                 "If you use Mesos Framework Rate Limiting, this framework's"
                 " principal identifies which rate limiting policy to apply")),
         at.add_argument(
             '--mesos_framework_role',
-            default=os.getenv('RELAY_MESOS_FRAMEWORK_ROLE'),
             type=str, help=(
                 "If you use Mesos Access Control Lists (ACLs) or apply"
                 " weighting to frameworks, your framework needs to register"
                 " with a role.")),
         at.add_argument(
             '--mesos_framework_name',
-            default=os.getenv('RELAY_MESOS_FRAMEWORK_NAME', 'framework'),
+            default='framework',
             help="Name the framework so you can identify it in the Mesos UI"),
         at.add_argument(
-            '--mesos_task_resources', type=lambda x: x.split('='), nargs='*',
-            default=dict(x.split('=') for x in os.getenv(
-                'RELAY_MESOS_TASK_RESOURCES', '=').split(' ')), help=(
+            '--mesos_task_resources',
+            type=lambda x: dict(
+                y.split('=') for y in x.replace(' ', ',').split(',')), help=(
                 "Specify what resources your task needs to execute.  These"
-                " can be any recognized mesos resource"
-                "  ie: --mesos_task_resources cpus=10 mem=30000"
+                " can be any recognized mesos resource and must be specified"
+                " as a string or comma separated list.  ie:"
+                "  --mesos_task_resources cpus=10,mem=30000"
             )),
-        at.add_argument(
-            '--docker_image',
-            default=os.getenv('RELAY_MESOS_DOCKER_IMAGE'), help=(
+        add_argument(
+            '--docker_image', help=(
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
-        at.add_argument(
-            '--volumes', default=os.getenv('RELAY_MESOS_VOLUMES'),
+        add_argument(
+            '--volumes',
             type=lambda x: tuple(tuple(y.split(':')) for y in x.split(',')),
             help=(
                 "If using containers, you may wish to mount volumes into those"
@@ -267,9 +270,8 @@ build_arg_parser = at.build_arg_parser([
                 " following format:"
                 "  --mesos_volumes host_path:container_path:mode,"
                 "host_path2:container_path2:mode,...")),
-        at.add_argument(
-            '--max_failures', type=int,
-            default=os.getenv('RELAY_MESOS_MAX_FAILURES', -1), help=(
+        add_argument(
+            '--max_failures', type=int, default=-1, help=(
                 "If tasks are failing too often, stop the driver and raise"
                 " an error.  If given, this (always positive) number"
                 " is a running count of (failures - successes - starting)"
