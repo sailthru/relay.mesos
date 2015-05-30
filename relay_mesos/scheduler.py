@@ -202,11 +202,11 @@ def _create_task(tid, offer, command, ns):
         task.container.type = task.container.DOCKER
     if ns.volumes:
         for host_path, container_path, mode in ns.volumes:
-            vol = mesos_pb2.Volume()
-            vol.host_path = host_path
-            vol.container_path = container_path
-            vol.mode = mode
-            task.container.volumes.add(vol)
+            task.container.volumes.add(
+                host_path=host_path,
+                container_path=container_path,
+                mode=mesos_pb2.Volume.Mode.Value(mode.upper())
+            )
     _create_task_add_task_resources(task, ns)
     return task
 

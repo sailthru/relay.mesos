@@ -75,3 +75,4 @@ relay:
     RELAY_MESOS_MAX_FAILURES: "10"
     RELAY_DELAY: "0.1"
     RELAY_MESOS_MASTER_STATE_FOR_DEMO: "http://master:5050/master/state.json"
+    RELAY_MESOS_VOLUMES: "./setup.py:/testfile:ro,./README.md:/testfile2:ro"
