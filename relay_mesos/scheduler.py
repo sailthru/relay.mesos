@@ -188,25 +188,31 @@ def _create_task(tid, offer, command, ns):
           ("/my/directory", "/path/on/container", "ro")
         ]
     """
-    task = mesos_pb2.TaskInfo()
-    task.task_id.value = tid
-    task.slave_id.value = offer.slave_id.value
+    task = dict(
+        task_id=mesos_pb2.TaskID(value=tid),
+        slave_id=offer.slave_id,
+        command=mesos_pb2.CommandInfo(value=command.format(**os.environ))
+    )
     if ns.mesos_framework_name:
-        task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
+        task.update(
+            name="relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid))
     else:
-        task.name = "relay.mesos task: %s" % tid
+        task.update(name="relay.mesos task: %s" % tid)
     # ability to inject os.environ values into the command
-    task.command.value = command.format(**os.environ)
     if ns.docker_image:
-        task.container.docker.image = ns.docker_image
-        task.container.type = task.container.DOCKER
-    if ns.volumes:
-        for host_path, container_path, mode in ns.volumes:
-            task.container.volumes.add(
+        volumes = [
+            mesos_pb2.Volume(
                 host_path=host_path,
                 container_path=container_path,
-                mode=mesos_pb2.Volume.Mode.Value(mode.upper())
-            )
+                mode=mesos_pb2.Volume.Mode.Value(mode.upper()))
+            for host_path, container_path, mode in ns.volumes]
+        task.update(
+            container=mesos_pb2.ContainerInfo(
+                type=mesos_pb2.ContainerInfo.DOCKER,
+                volumes=volumes,
+                docker=mesos_pb2.ContainerInfo.DockerInfo(image=ns.docker_image)
+            ))
+    task = mesos_pb2.TaskInfo(**task)
     _create_task_add_task_resources(task, ns)
     return task
 

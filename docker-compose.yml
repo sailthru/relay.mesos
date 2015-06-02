@@ -64,7 +64,7 @@ relay:
     - web
     - master
   environment:
-    RELAY_WARMER: "dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 10 + 5) ; echo my task is running for $dur seconds ; sleep $dur"
+    RELAY_WARMER: "dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 10 + 5) ; echo my task is running for $dur seconds ; ls / ; sleep $dur ; ls /mounted_testfile"
     # RELAY_WARMER: "dur=5 ; echo my task is running for $dur seconds ; sleep $dur"
     RELAY_METRIC: "relay_mesos.for_demo.num_active_mesos_tasks"
     # RELAY_TARGET: "relay_mesos.for_demo.target_value"
@@ -75,4 +75,5 @@ relay:
     RELAY_MESOS_MAX_FAILURES: "10"
     RELAY_DELAY: "0.1"
     RELAY_MESOS_MASTER_STATE_FOR_DEMO: "http://master:5050/master/state.json"
-    RELAY_MESOS_VOLUMES: "./setup.py:/testfile:ro,./README.md:/testfile2:ro"
+    RELAY_MESOS_VOLUMES: "/tmp/:/mounted_testfile:ro"
+    RELAY_MESOS_DOCKER_IMAGE: "ubuntu:14.04"

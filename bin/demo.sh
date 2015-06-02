@@ -35,4 +35,4 @@ webbrowser.open_new_tab("http://localdocker:8080")
 webbrowser.open_new_tab("http://localdocker:5050")
 EOF
 ) &
-docker-compose up
+docker-compose up --x-smart-recreate
