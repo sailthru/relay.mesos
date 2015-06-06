@@ -261,6 +261,12 @@ build_arg_parser = at.build_arg_parser([
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
         add_argument(
+            '--force_pull_image', action='store_true', default=False, type=bool,
+            help=(
+                "Before Relay.Mesos starts a docker container, ensure that the"
+                " container image is the most recently updated in the registry"
+            )),
+        add_argument(
             '--volumes',
             type=lambda x: tuple(tuple(y.split(':')) for y in x.split(',')),
             help=(

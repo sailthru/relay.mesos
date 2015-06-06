@@ -210,7 +210,10 @@ def _create_task(tid, offer, command, ns):
             container=mesos_pb2.ContainerInfo(
                 type=mesos_pb2.ContainerInfo.DOCKER,
                 volumes=volumes,
-                docker=mesos_pb2.ContainerInfo.DockerInfo(image=ns.docker_image)
+                docker=mesos_pb2.ContainerInfo.DockerInfo(
+                    image=ns.docker_image,
+                    force_pull_image=ns.force_pull_image
+                )
             ))
     task = mesos_pb2.TaskInfo(**task)
     _create_task_add_task_resources(task, ns)
