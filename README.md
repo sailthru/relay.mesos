@@ -1,11 +1,18 @@
+Relay Web UI:
+![](/screenshot_relay.png?raw=true)
+Mesos Web UI:
+![](/screenshot_mesos.png?raw=true)
+
+
 Relay.Mesos:  Run Relay and Mesos
 ==========
 
 In short, Relay.Mesos runs Relay as a Mesos framework.  By combining
 both of these tools, we can solve control loop problems that arise in
 distributed systems.  An example problem Relay.Mesos might solve is to
-spin up queue consumers to maintain a stable queue size.  You could also
-use Relay.Mesos to maintain a constant CPU usage on your mesos cluster.
+spin up queue consumers to maintain or minimize a queue size.  You could also
+use Relay.Mesos to set a target CPU usage over time for all instances of
+a particular task running on your mesos cluster.
 
 What is Relay?
 ----------
@@ -29,6 +36,15 @@ which resources are available and then provides ways to use those resources.
 reading)](http://mesos.berkeley.edu/mesos_tech_report.pdf)
 
 
+What is Relay.Mesos?
+----------
+Relay.Mesos will iteratively ask Mesos to run tasks on the cluster.
+These tasks will either eventually increase or eventually decrease some
+measured metric.  Relay.Mesos will quickly learn how the metric changes
+over time and tune its requests to Mesos so it can minimize the difference
+between the metric and a desired target value for that metric.
+
+
 Quickstart
 ==========
 
@@ -37,24 +53,18 @@ Quickstart
     - (if on a mac, you may need boot2docker and don't forget to add env vars to your .profile)
     - (if on ubuntu, you may need 3.16 kernel or later)
 
-1. Identify docker in /etc/hosts to make web browsers work:
+1. Identify docker in /etc/hosts
 
-        # my boot2docker ip is given by: `boot2docker ip` or $DOCKER_HOST
         # I added this to my /etc/hosts file:
-            192.168.59.103 localdocker
+        #    192.168.59.103 localdocker
+        # If you use boot2docker, this should work:
+        # $ echo "$(boot2docker ip) localdocker" | sudo tee -a /etc/hosts
 
 1. Run the demo script.
     - When you run this for the first time, docker may need to download a
       lot of the required images to get mesos running on your computer
 
             # ./bin/demo.sh     # run the demo
-            # ./bin/demo.sh N   # run the demo with N mesos slaves  (N=1 is plenty)
-            # ./bin/demo.sh -1  # remove all docker containers used in this demo
-
-1. To see relay.mesos in action, navigate your browser to:
-
-        http://localdocker:8080  # relay UI
-        http://localdocker:5050  # mesos UI
 
 
 Background
@@ -63,33 +73,41 @@ Background
 Relay.Mesos is made up of two primary components: a Mesos framework and
 a Relay event loop.  Relay continuously requests that the mesos
 framework run a number of tasks.  The framework receives resource
-offers from mesos and, if any Relay requests can be fulfilled, it will
-attempt to fulfill them.  If Relay requests can't be fulfilled because
-Mesos cluster is full, then the next time Relay.Mesos receives mesos resource
-offers, it will attempt to fulfill the largest Relay request since
-the last set of mesos resource offers was fulfilled.  In the current
-implementation, if no mesos resource offers are available for a long
-time, this can result in Relay.Mesos building up a history of error.  In
-this case, Relay.Mesos may over-react the moment mesos offers become available
-again, but it will eventually stabilize.
+offers from mesos and, if the most recent Relay request can be fulfilled,
+it will attempt to fulfill it by spinning up "warmer" or "cooler" tasks.
+If Relay requests can't be fulfilled because
+Mesos cluster is at capacity, then Relay will continue to ask to spin up
+tasks, but nothing will happen.
+
+If no mesos resource offers are available for a long time, Relay.Mesos
+will become starved for resources.  This can result in Relay.Mesos
+building up a history of error between the target and the metric.  If
+Relay.Mesos has been starved for Mesos resources for a while, when
+resources become available again, Relay might initially ask for too many
+resources because it's learned that asking for a lot of tasks to spin up
+results in very little or no difference in the metric.  In any case, it
+will quickly re-learn the right thing to do.
 
 In Relay.Mesos, as with Relay generally, there are 4 main components:
 metric, target, warmer and cooler.
 
-The ```metric``` and ```target``` are both python generator functions (ie timeseries), that, when called,
-each yield a number.  The ```metric``` is a signal that we're monitoring
-and manipulating.  The ```target``` represents a desired value that
-Relay attempts to make the ```metric``` mirror as closely as possible.
+The ```metric``` and ```target``` are both python generator functions
+(ie timeseries), that, when called, each yield a number.  The
+```metric``` is a signal that we're monitoring and manipulating.  The
+```target``` represents a desired value that Relay attempts to make the
+```metric``` mirror as closely as possible.
 
 The ```warmer``` and ```cooler``` are expected to (eventually) modify
 the metric.  Executing a ```warmer``` will increase the metric.
 Executing a ```cooler``` will decrease the metric.  In Relay.Mesos, the
 ```warmer``` and ```cooler``` are bash commands.  These may be executed in
-your custom docker container, if you wish.
+your docker containers, if you wish.
 
 
 Examples:
 ----------
+
+(See QuickStart for a demo using Docker containers)
 
 Relay.Mesos can ensure that the number of jobs running at any given
 time is enough to consume a queue.
@@ -113,3 +131,27 @@ Relay.Mesos can attempt to maintain a desired amount of cpu usage
     Target = 0
     Cooler = "run a bash command that uses the cpu"
     (Warmer not defined)
+
+
+Configuration Options:
+----------
+
+All configuration options specific to Relay.Mesos are visible when you
+run one of the following commands:
+```
+$ docker-compose run relay relay.mesos -h
+
+# or, if you have relay.mesos installed locally
+
+$ relay.mesos -h
+```
+
+Configuration options can also be passed in via environment variables
+
+Relay.Mesos options are prefixed with `RELAY_MESOS`.  For instance:
+
+    RELAY_MESOS_MASTER=zk://zookeeper:2181/mesos
+
+Relay-only options (ie those that start with "RELAY_"):
+
+    RELAY_DELAY=60

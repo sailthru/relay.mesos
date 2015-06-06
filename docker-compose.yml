@@ -1,0 +1,79 @@
+zookeeper:
+  image: jplock/zookeeper:3.4.6
+  expose:
+    - 2181
+    - 2888
+    - 3888
+
+master:
+  image: breerly/mesos
+  links:
+    - zookeeper
+  environment:
+    MESOS_CLUSTER: "DEMO"
+    MESOS_HOSTNAME: "localdocker"
+    MESOS_LOG_DIR: "/var/log"
+    MESOS_QUORUM: "1"
+    MESOS_REGISTRY: "in_memory"
+    MESOS_WORK_DIR: "/var/lib/mesos"
+    MESOS_ZK: "zk://zookeeper:2181/mesos"
+  ports:
+    - "5050:5050"
+  command: mesos-master
+
+slave1:
+  extends:
+    file: docker-compose-slaves.yml
+    service: slavebase
+  links:
+    - master
+    - zookeeper
+  ports:
+    - "5051:5051"
+
+slave2:
+  extends:
+    file: docker-compose-slaves.yml
+    service: slavebase
+  links:
+    - master
+    - zookeeper
+  ports:
+    - "5052:5052"
+
+slave3:
+  extends:
+    file: docker-compose-slaves.yml
+    service: slavebase
+  links:
+    - master
+    - zookeeper
+  ports:
+    - "5053:5053"
+
+web:
+  image: adgaudio/relay.web
+  ports:
+    - "8080:8080"
+    - "5673:5673"
+
+relay:
+  build: .
+  links:
+    - zookeeper
+    - web
+    - master
+  environment:
+    RELAY_WARMER: "dur=$(expr $(od -An -N2 -tu2 /dev/urandom) % 10 + 5) ; echo my task is running for $dur seconds ; ls / ; sleep $dur ; ls /mounted_testfile"
+    # RELAY_WARMER: "dur=5 ; echo my task is running for $dur seconds ; sleep $dur"
+    RELAY_METRIC: "relay_mesos.for_demo.num_active_mesos_tasks"
+    # RELAY_TARGET: "relay_mesos.for_demo.target_value"
+    RELAY_TARGET: "oscillating_setpoint"
+    RELAY_SENDSTATS: "tcp://web:5673"
+    RELAY_MESOS_TASK_RESOURCES: "cpus=0.1 mem=1"
+    RELAY_MESOS_MASTER: "zk://zookeeper:2181/mesos"
+    RELAY_MESOS_MAX_FAILURES: "10"
+    RELAY_DELAY: "0.1"
+    RELAY_MESOS_MASTER_STATE_FOR_DEMO: "http://master:5050/master/state.json"
+    RELAY_MESOS_VOLUMES: "/tmp/:/mounted_testfile:ro"
+    RELAY_MESOS_DOCKER_IMAGE: "ubuntu:14.04"

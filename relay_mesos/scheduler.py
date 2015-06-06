@@ -1,6 +1,7 @@
 from __future__ import division
 import os
 import random
+import time
 import sys
 
 import mesos.interface
@@ -92,8 +93,7 @@ def calc_tasks_per_offer(offer, task_resources):
         return num_tasks
 
 
-def create_tasks(MV, available_offers, driver, task_resources,
-                 command, docker_image, ns):
+def create_tasks(MV, available_offers, driver, command, ns):
     """
     Launch up to `MV` mesos tasks, depending on availability of mesos
     resources.
@@ -101,15 +101,6 @@ def create_tasks(MV, available_offers, driver, task_resources,
     `MV` max number of mesos tasks to spin up.  Relay chooses this number
     `available_offers` a dict of mesos offers and num tasks they can support
     `driver` a mesos driver instance
-    `task_resources` the stuff a task would consume:
-        {
-            "cpus": 10,
-            "mem": 1,
-            "disk": 12,
-            "ports": [(20, 34), (35, 35)],
-            "disks": ["sda1"]
-        }
-    `docker_image` (str|None) a docker image you wish to execute the command in
     """
     n_fulfilled = 0
     for offer, ntasks in available_offers:
@@ -129,38 +120,14 @@ def create_tasks(MV, available_offers, driver, task_resources,
                     offer_host=offer.hostname, task_id=tid,
                     mesos_framework_name=ns.mesos_framework_name))
             task = _create_task(
-                tid, offer, task_resources, command, docker_image, ns)
+                tid, offer, command, ns)
             tasks.append(task)
         driver.launchTasks(offer.id, tasks)
     return n_fulfilled
 
 
-def _create_task(tid, offer, task_resources, command, docker_image, ns):
-    """
-    `tid` (str) task id
-    `offer` a mesos Offer instance
-    `task_resources` the stuff a task would consume:
-        {
-            "cpus": 10,
-            "mem": 1,
-            "disk": 12,
-            "ports": [(20, 34), (35, 35)],
-            "disks": ["sda1"]
-        }
-    `docker_image` (str|None) a docker image you wish to execute the command in
-    """
-    task = mesos_pb2.TaskInfo()
-    task.task_id.value = tid
-    task.slave_id.value = offer.slave_id.value
-    if ns.mesos_framework_name:
-        task.name = "relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid)
-    else:
-        task.name = "relay.mesos task: %s" % tid
-    # ability to inject os.environ values into the command
-    task.command.value = command.format(**os.environ)
-    if docker_image:
-        task.container.docker.image = docker_image
-        task.container.type = task.container.DOCKER
+def _create_task_add_task_resources(task, ns):
+    task_resources = dict(ns.mesos_task_resources)
     seen = set()
     for key in set(SCALAR_KEYS).intersection(task_resources):
         seen.add(key)
@@ -190,6 +157,7 @@ def _create_task(tid, offer, task_resources, command, docker_image, ns):
         resource.type = mesos_pb2.Value.SET
         for elem in task_resources[key]:
             resource.set.item.append(typecast(elem))
+
     unrecognized_keys = set(task_resources).difference(seen)
     if unrecognized_keys:
         msg = "Unrecognized keys in task_resources!"
@@ -198,6 +166,54 @@ def _create_task(tid, offer, task_resources, command, docker_image, ns):
             mesos_framework_name=ns.mesos_framework_name))
         raise UserWarning(
             "%s unrecognized_keys: %s" % (msg, unrecognized_keys))
+
+
+def _create_task(tid, offer, command, ns):
+    """
+    `tid` (str) task id
+    `offer` a mesos Offer instance
+    `ns.mesos_task_resources` the stuff a task would consume:
+        {
+            "cpus": 10,
+            "mem": 1,
+            "disk": 12,
+            "ports": [(20, 34), (35, 35)],
+            "disks": ["sda1"]
+        }
+    `ns.docker_image` (str|None)
+        a docker image you wish to execute the command in
+    `ns.volumes` a list of volumes that get mounted into the container:
+        [
+          ("host_path", "container_path", "mode"),
+          ("/my/directory", "/path/on/container", "ro")
+        ]
+    """
+    task = dict(
+        task_id=mesos_pb2.TaskID(value=tid),
+        slave_id=offer.slave_id,
+        command=mesos_pb2.CommandInfo(value=command.format(**os.environ))
+    )
+    if ns.mesos_framework_name:
+        task.update(
+            name="relay.mesos task: %s: %s" % (ns.mesos_framework_name, tid))
+    else:
+        task.update(name="relay.mesos task: %s" % tid)
+    # ability to inject os.environ values into the command
+    if ns.docker_image:
+        volumes = [
+            mesos_pb2.Volume(
+                host_path=host_path,
+                container_path=container_path,
+                mode=mesos_pb2.Volume.Mode.Value(mode.upper()))
+            for host_path, container_path, mode in ns.volumes]
+        task.update(
+            container=mesos_pb2.ContainerInfo(
+                type=mesos_pb2.ContainerInfo.DOCKER,
+                volumes=volumes,
+                docker=mesos_pb2.ContainerInfo.DockerInfo(image=ns.docker_image)
+            ))
+    task = mesos_pb2.TaskInfo(**task)
+    _create_task_add_task_resources(task, ns)
     return task
 
 
@@ -266,7 +282,7 @@ class Scheduler(mesos.interface.Scheduler):
             num_offers=len(offers),
             mesos_framework_name=self.ns.mesos_framework_name))
         available_offers, decline_offers = filter_offers(
-            offers, dict(self.ns.task_resources))
+            offers, dict(self.ns.mesos_task_resources))
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:
@@ -287,8 +303,7 @@ class Scheduler(mesos.interface.Scheduler):
             return
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
-            driver=driver, task_resources=dict(self.ns.task_resources),
-            command=command, docker_image=self.ns.docker_image, ns=self.ns
+            driver=driver, command=command, ns=self.ns
         )
         driver.reviveOffers()
 
@@ -302,12 +317,12 @@ class Scheduler(mesos.interface.Scheduler):
         indefinitely for it:
 
           - other Mesos resourceOffers(...) calls to the Framework scheduler
-          - Relay warmer and cooler functions attempting to ask the Framework to
-            execute more tasks.
+          - Relay warmer and cooler functions attempting to ask the Framework
+            to execute more tasks.
         """
         command = None
         with self.MV.get_lock():
-            MV = self.MV.value
+            MV, t = self.MV
             # create tasks that fulfill relay's requests or return
             if MV == 0:
                 log.debug(
@@ -320,9 +335,11 @@ class Scheduler(mesos.interface.Scheduler):
                 elif MV < 0 and self.ns.cooler:
                     command = self.ns.cooler
                 if abs(MV) < len(available_offers):
-                    self.MV.value = 0
+                    self.MV[:] = [0, time.time()]
                 else:
-                    self.MV.value = MV - (MV > 0 or -1) * len(available_offers)
+                    new_MV = MV - (MV > 0 or -1) * max(abs(MV),
+                                                       len(available_offers))
+                    self.MV[:] = [new_MV, time.time()]
         return (MV, command)
 
     def statusUpdate(self, driver, update):

@@ -32,7 +32,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'relay.runner==0.1.7', 'mesos.cli', 'mesos.interface'],
+        'relay.runner==0.1.8', 'mesos.cli', 'mesos.interface>=0.22.0'],
 
     extras_require={
         'mesos': ['mesos.native'],
@@ -40,7 +40,7 @@ setup(
     tests_require=['nose'],
     test_suite="nose.main",
 
-    entry_points = {
+    entry_points={
         'console_scripts': [
             'relay.mesos = relay_mesos.__main__:go',
         ],
