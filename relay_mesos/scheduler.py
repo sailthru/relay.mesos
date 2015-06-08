@@ -191,7 +191,10 @@ def _create_task(tid, offer, command, ns):
     task = dict(
         task_id=mesos_pb2.TaskID(value=tid),
         slave_id=offer.slave_id,
-        command=mesos_pb2.CommandInfo(value=command.format(**os.environ))
+        command=mesos_pb2.CommandInfo(
+            value=command.format(**os.environ),
+            uris=[mesos_pb2.CommandInfo.URI(value=uri) for uri in ns.uris or []]
+        )
     )
     if ns.mesos_framework_name:
         task.update(

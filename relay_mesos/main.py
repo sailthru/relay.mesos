@@ -277,6 +277,9 @@ build_arg_parser = at.build_arg_parser([
                 "  --mesos_volumes host_path:container_path:mode,"
                 "host_path2:container_path2:mode,...")),
         add_argument(
+            '--uris', type=lambda x: x.split(','), help=(
+                "Comma-separated list of URIs to load before running command")),
+        add_argument(
             '--max_failures', type=int, default=-1, help=(
                 "If tasks are failing too often, stop the driver and raise"
                 " an error.  If given, this (always positive) number"
