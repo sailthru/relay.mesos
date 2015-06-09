@@ -250,7 +250,8 @@ build_arg_parser = at.build_arg_parser([
         at.add_argument(
             '--mesos_task_resources',
             type=lambda x: dict(
-                y.split('=') for y in x.replace(' ', ',').split(',')), help=(
+                y.split('=') for y in x.replace(' ', ',').split(',')),
+            default=[], help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource and must be specified"
                 " as a string or comma separated list.  ie:"
@@ -269,7 +270,7 @@ build_arg_parser = at.build_arg_parser([
         add_argument(
             '--volumes',
             type=lambda x: tuple(tuple(y.split(':')) for y in x.split(',')),
-            help=(
+            default=[], help=(
                 "If using containers, you may wish to mount volumes into those"
                 " containers.  Define the volumnes you wish to mount as"
                 " a comma-separated list of volumes with the"
@@ -277,7 +278,7 @@ build_arg_parser = at.build_arg_parser([
                 "  --mesos_volumes host_path:container_path:mode,"
                 "host_path2:container_path2:mode,...")),
         add_argument(
-            '--uris', type=lambda x: x.split(','), help=(
+            '--uris', type=lambda x: x.split(','), default=[], help=(
                 "Comma-separated list of URIs to load before running command")),
         add_argument(
             '--max_failures', type=int, default=-1, help=(

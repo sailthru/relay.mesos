@@ -193,7 +193,7 @@ def _create_task(tid, offer, command, ns):
         slave_id=offer.slave_id,
         command=mesos_pb2.CommandInfo(
             value=command.format(**os.environ),
-            uris=[mesos_pb2.CommandInfo.URI(value=uri) for uri in ns.uris or []]
+            uris=[mesos_pb2.CommandInfo.URI(value=uri) for uri in ns.uris]
         )
     )
     if ns.mesos_framework_name:
