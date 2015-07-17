@@ -26,9 +26,10 @@ https://github.com/sailthru/relay/blob/master/README.md)
 What is Mesos?
 ----------
 Apache Mesos is "a distributed systems kernel."  It pools resources from
-networked machines and then provides a platform that executes code
-over those resources.  It's basically a bin-packing scheduler that identifies
-which resources are available and then provides ways to use those resources.
+networked machines and then provides a platform that executes code over
+those resources.  It's basically a bin-packing scheduler and resource
+manager that identifies which resources are available and then provides
+ways to use those resources.
 
 [Details on Mesos's landing page.](http://mesos.apache.org/)
 
@@ -109,6 +110,8 @@ Examples:
 
 (See QuickStart for a demo using Docker containers)
 
+#### Autoscaling processes that run, complete, and then exit:
+
 Relay.Mesos can ensure that the number of jobs running at any given
 time is enough to consume a queue.
 
@@ -132,6 +135,26 @@ Relay.Mesos can attempt to maintain a desired amount of cpu usage
     Cooler = "run a bash command that uses the cpu"
     (Warmer not defined)
 
+#### Autoscaling long-running processes that never die.
+
+Relay.Mesos can auto-scale the number of web-servers running in
+Marathon:
+
+    Metric = desired number of web servers (as function of current load)
+    Target = number of webserver instances in Marathon
+    Warmer = Marathon API call to increase # webserver instances by 1
+    Cooler = Marathon API call to decrease # webserver instances by 1
+
+Relay.Mesos can guarantee a minimum number of running redis instances
+
+    Metric = max(min_instances, desired num of redis instances)
+    Target = current number of redis instances
+    Warmer = API call to increase # redis instances by 1
+    Cooler = API call to decrease # redis instances by 1
+
+When auto-scaling long-running processes, you may need to set the
+```--relay_delay```  (ie. min num seconds between warmer / cooler calls)
+to a number larger than the default value of 1 second.
 
 Configuration Options:
 ----------
