@@ -152,9 +152,46 @@ Relay.Mesos can guarantee a minimum number of running redis instances
     Warmer = API call to increase # redis instances by 1
     Cooler = API call to decrease # redis instances by 1
 
+##### Math side-note if you need help calculating a Metric function
+
+A Metric function that might ensure that the number of instances is
+between some bounds could use the following equation:
+
+```
+(Qsize - Qminsize) / (Qmaxsize - Qminsize) * (Imax - Imin) + Imin
+```
+where
+```
+Qsize = current queue size
+Qmax = maximum expected queue size
+Qmin = minimum expected queue size (ie 0)
+Imax = Max desired num of instances
+Imin = Min desired num of instances
+```
+
+To get you thinking in the right direction, consider this scenario:
+Perhaps you have a real-valued metric that is much larger than the
+number of tasks/instances you may be auto scaling.  Perhaps you also don't know
+the max and min values of the metric, but you have a mean and standard
+deviation.  You can experiment with a metric function that bounces
+between -1 and 1, with occasional numbers beyond the range.  For
+instance, you could try the below function, and also perhaps have the
+mean and standard deviation iteratively update over time:
+
+    Metric = `(Qsize - Qmean) // Qstdev`  # the // means integer division
+                                          # rather than floating point division
+                                          # 1 / 2 == .5  VS 1 // 2 = 0`
+    Target = 0
+    Warmer = "cmd to add more servers"
+    Cooler = "cmd to remove some servers"
+
+More complex metrics might use other scaling functions, a logistic
+function, probabilistic expressions or regression functions.
+
 When auto-scaling long-running processes, you may need to set the
 ```--relay_delay```  (ie. min num seconds between warmer / cooler calls)
 to a number larger than the default value of 1 second.
+
 
 Configuration Options:
 ----------
