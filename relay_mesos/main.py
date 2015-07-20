@@ -258,9 +258,28 @@ build_arg_parser = at.build_arg_parser([
                 "  --mesos_task_resources cpus=10,mem=30000"
             )),
         add_argument(
+            '--uris', type=lambda x: x.split(','), default=[], help=(
+                "Comma-separated list of URIs to load before running command")),
+        add_argument(
+            '--max_failures', type=int, default=-1, help=(
+                "If tasks are failing too often, stop the driver and raise"
+                " an error.  If given, this (always positive) number"
+                " is a running count of (failures - successes - starting)"
+                " tasks.  It is sensitive to many consecutive failures and"
+                " will mostly ignore failures if a lot of tasks"
+                " are starting or completing at once"
+            )),
+    ),
+    at.group(
+        "Relay.Mesos Docker parameters",
+        add_argument(
             '--docker_image', help=(
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
+        add_argument(
+            '--docker_network', choices=("HOST", "BRIDGE", "NONE"),
+            default="BRIDGE", help=(
+                "Docker: Set the Network mode for the container: --net ")),
         add_argument(
             '--force_pull_image', action='store_true', default=False, type=bool,
             help=(
@@ -277,18 +296,6 @@ build_arg_parser = at.build_arg_parser([
                 " following format:"
                 "  --mesos_volumes host_path:container_path:mode,"
                 "host_path2:container_path2:mode,...")),
-        add_argument(
-            '--uris', type=lambda x: x.split(','), default=[], help=(
-                "Comma-separated list of URIs to load before running command")),
-        add_argument(
-            '--max_failures', type=int, default=-1, help=(
-                "If tasks are failing too often, stop the driver and raise"
-                " an error.  If given, this (always positive) number"
-                " is a running count of (failures - successes - starting)"
-                " tasks.  It is sensitive to many consecutive failures and"
-                " will mostly ignore failures if a lot of tasks"
-                " are starting or completing at once"
-            )),
     ),
 ],
     description=(
