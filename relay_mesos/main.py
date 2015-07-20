@@ -88,6 +88,11 @@ def main(ns):
             extra=dict(mesos_framework_name=ns.mesos_framework_name))
         build_arg_parser().print_usage()
         sys.exit(1)
+    if not ns.mesos_task_resources:
+        log.warn(
+            "You didn't define '--mesos_task_resources'."
+            "  Tasks may not start on slaves",
+            extra=dict(mesos_framework_name=ns.mesos_framework_name))
     log.info(
         "Starting Relay Mesos!",
         extra={k: str(v) for k, v in ns.__dict__.items()})
@@ -251,7 +256,7 @@ build_arg_parser = at.build_arg_parser([
             '--mesos_task_resources',
             type=lambda x: dict(
                 y.split('=') for y in x.replace(' ', ',').split(',')),
-            default=[], help=(
+            default={}, help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource and must be specified"
                 " as a string or comma separated list.  ie:"
