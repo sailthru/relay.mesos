@@ -262,6 +262,15 @@ build_arg_parser = at.build_arg_parser([
                 " as a string or comma separated list.  ie:"
                 "  --mesos_task_resources cpus=10,mem=30000"
             )),
+        at.add_argument(
+            '--mesos_environment', type=lambda fp: [
+                tuple(y.strip() for y in x.strip().split('=', 1))
+                for x in open(fp).readlines()],
+            default=[], help=(
+                "A filepath containing environment variables to define on all"
+                " warmer and cooler tasks."
+                "File should contain one variable per line, in form VAR1=VAL1"
+            )),
         add_argument(
             '--uris', type=lambda x: x.split(','), default=[], help=(
                 "Comma-separated list of URIs to load before running command")),
