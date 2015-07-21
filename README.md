@@ -137,11 +137,10 @@ Relay.Mesos can attempt to maintain a desired amount of cpu usage
 
 #### Autoscaling long-running processes that never die.
 
-Relay.Mesos can auto-scale the number of web-servers running in
-Marathon:
+Relay.Mesos can auto-scale the number of web-servers running:
 
     Metric = desired number of web servers (as function of current load)
-    Target = number of webserver instances in Marathon
+    Target = number of webserver instances currently running
     Warmer = Marathon API call to increase # webserver instances by 1
     Cooler = Marathon API call to decrease # webserver instances by 1
 
@@ -190,7 +189,10 @@ function, probabilistic expressions or regression functions.
 
 When auto-scaling long-running processes, you may need to set the
 ```--relay_delay```  (ie. min num seconds between warmer / cooler calls)
-to a number larger than the default value of 1 second.
+to a number larger than the default value of 1 second.  Also, if you
+find that the long-running process is already mesos-aware (ie running
+via Marathon), it might make it more sense for you to use
+[Relay](http://www.github.com/sailthru/relay) rather than Relay.Mesos.
 
 
 Configuration Options:
