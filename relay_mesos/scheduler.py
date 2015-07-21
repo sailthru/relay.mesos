@@ -1,5 +1,4 @@
 from __future__ import division
-import os
 import random
 import time
 import sys
@@ -192,7 +191,7 @@ def _create_task(tid, offer, command, ns):
         task_id=mesos_pb2.TaskID(value=tid),
         slave_id=offer.slave_id,
         command=mesos_pb2.CommandInfo(
-            value=command.format(**os.environ),
+            value=command,
             uris=[mesos_pb2.CommandInfo.URI(value=uri) for uri in ns.uris],
             environment=mesos_pb2.Environment(variables=[
                 mesos_pb2.Environment.Variable(name=k, value=v)
