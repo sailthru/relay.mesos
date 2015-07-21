@@ -273,7 +273,8 @@ build_arg_parser = at.build_arg_parser([
             )),
         add_argument(
             '--uris', type=lambda x: x.split(','), default=[], help=(
-                "Comma-separated list of URIs to load before running command")),
+                "Comma-separated list of URIs to load before running command"
+            )),
         add_argument(
             '--max_failures', type=int, default=-1, help=(
                 "If tasks are failing too often, stop the driver and raise"
@@ -295,7 +296,8 @@ build_arg_parser = at.build_arg_parser([
             default="BRIDGE", help=(
                 "Docker: Set the Network mode for the container: --net ")),
         add_argument(
-            '--force_pull_image', action='store_true', default=False, type=bool,
+            '--force_pull_image', action='store_true', default=False,
+            type=bool,
             help=(
                 "Before Relay.Mesos starts a docker container, ensure that the"
                 " container image is the most recently updated in the registry"
