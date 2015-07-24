@@ -76,6 +76,7 @@ relay:
     RELAY_DELAY: "0.1"
     RELAY_MESOS_MASTER_STATE_FOR_DEMO: "http://master:5050/master/state.json"
     RELAY_MESOS_VOLUMES: "/tmp/:/mounted_testfile:ro"
+    RELAY_MESOS_CHECKPOINT: true
     RELAY_MESOS_ENVIRONMENT: "/etc/lsb-release"
     RELAY_MESOS_DOCKER_IMAGE: "ubuntu:14.04"
     # RELAY_MESOS_DOCKER_NETWORK: "BRIDGE"

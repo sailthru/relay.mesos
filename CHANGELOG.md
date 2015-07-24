@@ -7,6 +7,7 @@
 - Removes interpolation of environment variables into the bash command by python.
 
 ####New Features
+- --mesos_checkpoint option to enable framework-level checkpointing
 - Adds ability to define environment variables into warmer and cooler tasks
 - Docker: adds --net BRIDGE|HOST|NONE option
 - Support for defining --uris

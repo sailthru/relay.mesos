@@ -198,6 +198,8 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
         framework.principal = ns.mesos_framework_principal
     if ns.mesos_framework_role:
         framework.role = ns.mesos_framework_role
+    if ns.mesos_checkpoint:
+        framework.checkpoint = True
 
     # build driver
     driver = mesos.native.MesosSchedulerDriver(
@@ -252,6 +254,12 @@ build_arg_parser = at.build_arg_parser([
             '--mesos_framework_name',
             default='framework',
             help="Name the framework so you can identify it in the Mesos UI"),
+        at.add_argument(
+            '--mesos_checkpoint', action='store_true', type=bool, default=False,
+            help=(
+                "This option enables Mesos Framework checkpointing.  This"
+                " means that tasks spun up by Relay.Mesos will survive even if"
+                " this Relay.Mesos instance dies.")),
         at.add_argument(
             '--mesos_task_resources',
             type=lambda x: dict(
