@@ -220,6 +220,9 @@ def _create_task(tid, offer, command, ns):
                     force_pull_image=ns.force_pull_image,
                     network=mesos_pb2.ContainerInfo.DockerInfo.Network.Value(
                         ns.docker_network),
+                    parameters=[
+                        mesos_pb2.Parameter(key=k, value=v)
+                        for k, v in ns.docker_parameters.items()],
                 )
             ))
     task = mesos_pb2.TaskInfo(**task)

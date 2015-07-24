@@ -1,5 +1,6 @@
 import atexit
 import multiprocessing as mp
+import json
 import signal
 import sys
 import time
@@ -295,6 +296,14 @@ build_arg_parser = at.build_arg_parser([
     ),
     at.group(
         "Relay.Mesos Docker parameters",
+        add_argument(
+            '--docker_parameters', default={}, type=json.loads, help=(
+                "Supply arbitrary command-line options for the docker run"
+                "command executed by the Mesos containerizer.  Note that any"
+                "parameters passed in this manner are not guaranteed to be"
+                "supported in the future.  Pass parameters as a JSON dict:\n"
+                '  --docker_parameters \'{"volumes-from": "myimage", ...}\''
+            )),
         add_argument(
             '--docker_image', help=(
                 "The name of a docker image if you wish to execute the"

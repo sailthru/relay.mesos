@@ -1,12 +1,13 @@
 ###Differences between major versions of Relay.Mesos
 
 
-## <2.0
+## 2.0
 
 ####Backwards Incompatible
 - Removes interpolation of environment variables into the bash command by python.
 
 ####New Features
+- Docker: --docker_parameters for asking mesos to pass params to `docker run`
 - --mesos_checkpoint option to enable framework-level checkpointing
 - Adds ability to define environment variables into warmer and cooler tasks
 - Docker: adds --net BRIDGE|HOST|NONE option
@@ -17,7 +18,7 @@
 - relay.mesos fails if --uris and --volumes are not defined
 
 
-## <1.0
+## 1.0
 
 ####Backwards Incompatible
 - RELAY_DOCKER_IMAGE and RELAY_TASKS_RESOURCES are now RELAY_MESOS_DOCKER_IMAGE and RELAY_MESOS_TASK...
