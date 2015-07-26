@@ -1,7 +1,9 @@
-###Differences between major versions of Relay.Mesos
+Differences between major versions of Relay.Mesos
+=================================================
 
 
-## 2.0
+2.0 (Unreleased)
+----------------
 
 ####Backwards Incompatible
 - Removes interpolation of environment variables into the bash command by python.
@@ -18,7 +20,8 @@
 - relay.mesos fails if --uris and --volumes are not defined
 
 
-## 1.0
+1.0 (2015-06-05)
+----------------
 
 ####Backwards Incompatible
 - RELAY_DOCKER_IMAGE and RELAY_TASKS_RESOURCES are now RELAY_MESOS_DOCKER_IMAGE and RELAY_MESOS_TASK...
