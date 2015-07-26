@@ -8,7 +8,7 @@ except ImportError:
 
 setup(
     name='relay.mesos',
-    version='2.0.dev0',
+    version='2.0',
     description=(
         'A plugin for Relay that lets you run Relay on Mesos to'
         ' auto-scale the number of concurrently running instances'

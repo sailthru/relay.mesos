@@ -2,7 +2,7 @@ Differences between major versions of Relay.Mesos
 =================================================
 
 
-2.0 (Unreleased)
+2.0 (2015-07-26)
 ----------------
 
 ####Backwards Incompatible
