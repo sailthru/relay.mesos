@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import json
 import os
 import urllib2
@@ -11,9 +12,8 @@ def num_active_mesos_tasks():
     while True:
         data = json.load(urllib2.urlopen(
             os.environ['RELAY_MESOS_MASTER_STATE_FOR_DEMO']))
-        yield data['started_tasks'] + data['staged_tasks'] - (
-            data['failed_tasks'] + data['killed_tasks'] +
-            data['lost_tasks'] + data['finished_tasks'])
+        yield [len(x['tasks']) for x in data['frameworks']
+               if x['name'] == 'Relay.Mesos: Demo Framework'][0]
 
 
 def target_value():

@@ -6,7 +6,7 @@ zookeeper:
     - 3888
 
 master:
-  image: breerly/mesos
+  image: mesosphere/mesos-master:0.23.0-1.0.ubuntu1404
   links:
     - zookeeper
   environment:
@@ -28,6 +28,8 @@ slave1:
   links:
     - master
     - zookeeper
+  environment:
+    MESOS_ATTRIBUTES: "test_flag:red"
   ports:
     - "5051:5051"
 
@@ -38,6 +40,8 @@ slave2:
   links:
     - master
     - zookeeper
+  environment:
+    MESOS_ATTRIBUTES: "test_flag:blue"
   ports:
     - "5052:5052"
 
@@ -50,6 +54,8 @@ slave3:
     - zookeeper
   ports:
     - "5053:5053"
+  # environment:
+  #   MESOS_ATTRIBUTES: "test_flag:purple"
 
 web:
   image: adgaudio/relay.web
@@ -70,6 +76,7 @@ relay:
     # RELAY_TARGET: "relay_mesos.for_demo.target_value"
     RELAY_TARGET: "oscillating_setpoint"
     RELAY_SENDSTATS: "tcp://web:5673"
+    RELAY_MESOS_FRAMEWORK_NAME: "Demo Framework"
     RELAY_MESOS_TASK_RESOURCES: "cpus=0.1 mem=1"
     RELAY_MESOS_MASTER: "zk://zookeeper:2181/mesos"
     RELAY_MESOS_MAX_FAILURES: "10"
