@@ -224,6 +224,15 @@ add_argument = at.add_argument_default_from_env_factory(
     env_prefix='RELAY_MESOS_')
 
 
+def argparse_dict_type(inpt_str):
+    return dict(
+        y.split('=') for y in inpt_str.strip().replace(' ' , ',').split(','))
+
+
+def argparse_tuple_kv_type(input_str):
+    return tuple(tuple(y.split(':')) for y in input_str.split(','))
+
+
 build_arg_parser = at.build_arg_parser([
     at.group(
         "How does Relay.mesos affect your metric?",
@@ -260,13 +269,11 @@ build_arg_parser = at.build_arg_parser([
                 " means that tasks spun up by Relay.Mesos will survive even if"
                 " this Relay.Mesos instance dies.")),
         at.add_argument(
-            '--mesos_task_resources',
-            type=lambda x: dict(
-                y.split('=') for y in x.replace(' ', ',').split(',')),
+            '--mesos_task_resources', type=argparse_dict_type,
             default={}, help=(
                 "Specify what resources your task needs to execute.  These"
                 " can be any recognized mesos resource and must be specified"
-                " as a string or comma separated list.  ie:"
+                " as a comma separated list.  ie:"
                 "  --mesos_task_resources cpus=10,mem=30000"
             )),
         at.add_argument(
@@ -277,6 +284,13 @@ build_arg_parser = at.build_arg_parser([
                 "A filepath containing environment variables to define on all"
                 " warmer and cooler tasks."
                 "File should contain one variable per line, in form VAR1=VAL1"
+            )),
+        at.add_argument(
+            '--mesos_attribute_matches_all', type=argparse_dict_type,
+            help=(
+                "Only spin up tasks on mesos slaves whose attributes match the"
+                " given criteria.  Pass as a comma separated list.  ie:"
+                " --mesos_attribute_matches_all host=my.host,flag=red"
             )),
         add_argument(
             '--uris', type=lambda x: x.split(','), default=[], help=(
@@ -319,7 +333,7 @@ build_arg_parser = at.build_arg_parser([
             )),
         add_argument(
             '--volumes',
-            type=lambda x: tuple(tuple(y.split(':')) for y in x.split(',')),
+            type=argparse_tuple_kv_type,
             default=[], help=(
                 "If using containers, you may wish to mount volumes into those"
                 " containers.  Define the volumnes you wish to mount as"

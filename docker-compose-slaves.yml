@@ -8,15 +8,7 @@ slavebase:
     MESOS_MASTER: "zk://zookeeper:2181/mesos"
     MESOS_LOG_DIR: "/var/log"
     MESOS_WORK_DIR: "/var/lib/mesos"
-    # MESOS_ATTRIBUTES: "public:true"
   volumes:
     - /sys/fs/cgroup:/sys/fs/cgroup
     - /usr/local/bin/docker:/usr/bin/docker
     - /var/run/docker.sock:/var/run/docker.sock
-  #   - /tmp/mesoswork:/tmp/mesoswork
-  #   - /sys:/sys
-  #   - /proc:/proc
-  # --net=host \
-  # -e MESOS_ISOLATOR=cgroups/cpu,cgroups/mem \
-
-

@@ -20,7 +20,7 @@ class MaxFailuresReached(Exception):
     pass
 
 
-def filter_offers(offers, task_resources):
+def filter_offers(offers, task_resources, mesos_attributes):
     """
     Determine which offers are usable
 
@@ -33,11 +33,20 @@ def filter_offers(offers, task_resources):
             "ports": [(20, 34), (35, 35)],
             "disks": ["sda1"]
         }
+    `mesos_attributes` might need these mesos slave attributes to run a task:
+        {
+            "hostname": "my.host1",
+            "environment": "dev-group1"
+        }
+
     """
     available_offers = []
     decline_offers = []
     for offer in offers:
-        ntasks = calc_tasks_per_offer(offer, task_resources)
+        if _offer_has_valid_attributes(offer, mesos_attributes):
+            ntasks = _calc_tasks_per_offer(offer, task_resources)
+        else:
+            ntasks = 0
         if ntasks == 0:
             decline_offers.append(offer)
             continue
@@ -45,7 +54,34 @@ def filter_offers(offers, task_resources):
     return available_offers, decline_offers
 
 
-def calc_tasks_per_offer(offer, task_resources):
+def _offer_has_valid_attributes(offer, mesos_attributes):
+    """
+    Determine whether an offer matches all of the given attributes.
+    If it does, return True, and otherwise False.
+    """
+    if not mesos_attributes:
+        return True
+    offer_attrs = {}
+    for attr in offer.attributes:
+        k = attr.name
+        if attr.type in [0, mesos_pb2.Attribute.SCALAR_FIELD_NUMBER]:
+            # 0 is a temp hack until mesos fully supports attributes with types
+            v = (float, attr.scalar.value)
+        else:
+            log.error(attr.type)
+            raise NotImplementedError(
+                "Unrecognized Attribute Type: %s" % attr.type)
+        offer_attrs[k] = v
+    for k, v in mesos_attributes.items():
+        if k not in offer_attrs:
+            return False
+        f, v2 = offer_attrs.get(k)
+        if f(v) != v2:
+            return False
+    return True
+
+
+def _calc_tasks_per_offer(offer, task_resources):
     """
     Decide how many tasks a given mesos Offer can contain.
 
@@ -72,7 +108,7 @@ def calc_tasks_per_offer(offer, task_resources):
                 num_tasks = 0
                 break
         elif res.name in RANGE_KEYS:
-            raise NotImplementedError("TODO ... not sure how to handle this")
+            raise NotImplementedError("TODO ... Implement support for this")
             # what does reqval look like?
             # reqval = float(task_resources.get(res.name))
             # if any(start <= reqval <= stop
@@ -81,7 +117,7 @@ def calc_tasks_per_offer(offer, task_resources):
             # else:
             # val = list(val) ???
         elif res.name in SET_KEYS:
-            raise NotImplementedError("TODO ... not sure how to handle this")
+            raise NotImplementedError("TODO ... Implement support for this")
         else:
             raise NotImplementedError((
                 "Unrecognized mesos resource: %s.  You should figure out how"
@@ -295,7 +331,9 @@ class Scheduler(mesos.interface.Scheduler):
             num_offers=len(offers),
             mesos_framework_name=self.ns.mesos_framework_name))
         available_offers, decline_offers = filter_offers(
-            offers, dict(self.ns.mesos_task_resources))
+            offers,
+            dict(self.ns.mesos_task_resources),
+            self.ns.mesos_attribute_matches_all)
         for offer in decline_offers:
             driver.declineOffer(offer.id)
         if not available_offers:

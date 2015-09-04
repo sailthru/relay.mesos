@@ -22,6 +22,7 @@ master:
   command: mesos-master
 
 slave1:
+  hostname: slave1
   extends:
     file: docker-compose-slaves.yml
     service: slavebase
@@ -29,11 +30,12 @@ slave1:
     - master
     - zookeeper
   environment:
-    MESOS_ATTRIBUTES: "test_flag:red"
+    MESOS_ATTRIBUTES: "slaves:12"
   ports:
     - "5051:5051"
 
 slave2:
+  hostname: slave2
   extends:
     file: docker-compose-slaves.yml
     service: slavebase
@@ -41,11 +43,12 @@ slave2:
     - master
     - zookeeper
   environment:
-    MESOS_ATTRIBUTES: "test_flag:blue"
+    MESOS_ATTRIBUTES: "slaves:2"
   ports:
     - "5052:5052"
 
 slave3:
+  hostname: slave3
   extends:
     file: docker-compose-slaves.yml
     service: slavebase
@@ -55,7 +58,7 @@ slave3:
   ports:
     - "5053:5053"
   # environment:
-  #   MESOS_ATTRIBUTES: "test_flag:purple"
+  #   MESOS_ATTRIBUTES: "myattr:myval"
 
 web:
   image: adgaudio/relay.web
@@ -90,3 +93,5 @@ relay:
     # RELAY_MESOS_DOCKER_PARAMETERS: '{"rm": "true"}'
     RELAY_MESOS_FORCE_PULL_IMAGE: true
     RELAY_MESOS_URIS: "/etc/profile"
+    # RELAY_MESOS_ATTRIBUTE_MATCHES_ALL: "test_flag=no_slaves_have_this_flag"
+    RELAY_MESOS_ATTRIBUTE_MATCHES_ALL: "slaves=12"
