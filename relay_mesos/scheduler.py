@@ -65,8 +65,9 @@ def _offer_has_valid_attributes(offer, mesos_attributes):
     for attr in offer.attributes:
         k = attr.name
         if attr.type in [0, mesos_pb2.Attribute.SCALAR_FIELD_NUMBER]:
-            # 0 is a temp hack until mesos fully supports attributes with types
-            v = (float, attr.scalar.value)
+            # this is a hack until mesos fully supports attributes with types
+            _v = attr.text.value or attr.scalar.value
+            v = (type(_v), _v)  # str or float
         else:
             log.error(attr.type)
             raise NotImplementedError(
@@ -75,11 +76,15 @@ def _offer_has_valid_attributes(offer, mesos_attributes):
     for k, v in mesos_attributes.items():
         if k not in offer_attrs:
             return False
-        f, v2 = offer_attrs.get(k)
+        f, v2 = offer_attrs[k]
+        try:  # some attributes can't convert into the expected type
+            f(v)
+        except ValueError:
+            return False
         if f(v) != v2:
             return False
-    return True
 
+    return True
 
 def _calc_tasks_per_offer(offer, task_resources):
     """
