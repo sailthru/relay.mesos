@@ -292,8 +292,6 @@ class Scheduler(mesos.interface.Scheduler):
             driver, frameworkId, masterInfo)
 
     def _registered(self, driver, frameworkId, masterInfo):
-        self.mesos_ready.acquire()
-        self.mesos_ready.notify()
         self.mesos_ready.release()
 
         log.info(

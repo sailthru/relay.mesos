@@ -107,7 +107,7 @@ def main(ns):
     # store exceptions that may be raised
     exception_receiver, exception_sender = mp.Pipe(False)
     # notify relay when mesos framework is ready
-    mesos_ready = mp.Condition()
+    mesos_ready = mp.Semaphore(0)
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
@@ -168,7 +168,6 @@ def init_relay(ns_relay, mesos_ready, mesos_framework_name):
         'Relay waiting to start until mesos framework is registered',
         extra=dict(mesos_framework_name=mesos_framework_name))
     mesos_ready.acquire()
-    mesos_ready.wait()
     log.debug(
         'Relay notified that mesos framework is registered',
         extra=dict(mesos_framework_name=mesos_framework_name))
@@ -203,6 +202,7 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
         framework.role = ns.mesos_framework_role
 
     # build driver
+    log.debug("Instantiating MesosSchedulerDriver")
     driver = mesos.native.MesosSchedulerDriver(
         Scheduler(
             MV=MV, exception_sender=exception_sender, mesos_ready=mesos_ready,
@@ -212,6 +212,7 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
     atexit.register(driver.stop)
 
     # run things
+    log.debug("Running the instance of MesosSchedulerDriver")
     status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
     driver.stop()  # Ensure that the driver process terminates.
     sys.exit(status)
