@@ -12,6 +12,10 @@ from relay_mesos.util import catch
 from relay_mesos.scheduler import Scheduler
 
 
+class TimeoutError(Exception):
+    pass
+
+
 def warmer_cooler_wrapper(MV, ns):
     """
     Act as a warmer or cooler function such that, instead of executing code,
@@ -107,7 +111,7 @@ def main(ns):
     # store exceptions that may be raised
     exception_receiver, exception_sender = mp.Pipe(False)
     # notify relay when mesos framework is ready
-    mesos_ready = mp.Semaphore(0)
+    mesos_ready = mp.Event()
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
@@ -166,8 +170,11 @@ def main(ns):
 def init_relay(ns_relay, mesos_ready, mesos_framework_name):
     log.debug(
         'Relay waiting to start until mesos framework is registered',
-        extra=dict(mesos_framework_name=mesos_framework_name))
-    mesos_ready.acquire()
+        extra=dict(mesos_framework_name=mesos_framework_name,
+                   timeout=ns_relay.init_timeout))
+    mesos_ready.wait(ns_relay.init_timeout)
+    if not mesos_ready.is_set():
+        raise TimeoutError("Mesos Scheduler took too long to come up!")
     log.debug(
         'Relay notified that mesos framework is registered',
         extra=dict(mesos_framework_name=mesos_framework_name))
@@ -245,7 +252,16 @@ build_arg_parser = at.build_arg_parser([
             " A cooler should eventually decrease metric values.")),
     ),
     at.group(
-        "Relay.Mesos parameters",
+        "Relay.Mesos -- General parameters",
+        add_argument(
+            '--init_timeout', default=20, help=(
+                "By default, wait at most N seconds for the Mesos Scheduler"
+                " to start up before the Relay scheduler starts.  If timeout"
+                " is exceeded, raise an error and exit."
+            )),
+    ),
+    at.group(
+        "Relay.Mesos -- Mesos-specific parameters",
         at.add_argument(
             '--mesos_master',
             help="URI to mesos master. We support whatever mesos supports"
@@ -308,7 +324,7 @@ build_arg_parser = at.build_arg_parser([
             )),
     ),
     at.group(
-        "Relay.Mesos Docker parameters",
+        "Relay.Mesos -- Docker parameters",
         add_argument(
             '--docker_parameters', default={}, type=json.loads, help=(
                 "Supply arbitrary command-line options for the docker run"

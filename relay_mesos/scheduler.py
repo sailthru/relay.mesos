@@ -292,7 +292,7 @@ class Scheduler(mesos.interface.Scheduler):
             driver, frameworkId, masterInfo)
 
     def _registered(self, driver, frameworkId, masterInfo):
-        self.mesos_ready.release()
+        self.mesos_ready.set()
 
         log.info(
             "Registered with master", extra=dict(
