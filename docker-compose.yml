@@ -22,7 +22,6 @@ master:
   command: mesos-master
 
 slave1:
-  hostname: slave1
   extends:
     file: docker-compose-slaves.yml
     service: slavebase
@@ -31,6 +30,7 @@ slave1:
     - zookeeper
   environment:
     MESOS_ATTRIBUTES: "group:12;flag:red;"
+    MESOS_HOSTNAME: "slave1"
   ports:
     - "5051:5051"
 
@@ -44,6 +44,7 @@ slave2:
     - zookeeper
   environment:
     MESOS_ATTRIBUTES: "group:12"
+    MESOS_HOSTNAME: "slave2"
   ports:
     - "5052:5052"
 
@@ -57,7 +58,8 @@ slave3:
     - zookeeper
   ports:
     - "5053:5053"
-  # environment:
+  environment:
+    MESOS_HOSTNAME: "slave3"
   #   MESOS_ATTRIBUTES: "myattr:myval"
 
 web:

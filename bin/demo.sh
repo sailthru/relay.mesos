@@ -13,7 +13,7 @@
 # Then, add "<IP> docker" to /etc/hosts to make web browsers work
 # ie my boot2docker ip is given by: `boot2docker ip`
 # I added this to my /etc/hosts file:
-#  192.168.59.103 localdocker
+#  192.168.59.103 localdocker slave1 slave2 slave3
 
 # Run this script.  When you run this for the first time, docker may need to
 # download a lot of the required images to get mesos running on your computer
