@@ -6,11 +6,9 @@ Differences between major versions of Relay.Mesos
 ----------------
 
 ####New Features
-- Basic support for Mesos Attributes (ie similar to Marathon Constraints)
+- Mesos: Basic support for Attributes (ie similar to Marathon Constraints)
 - Docker-compose: use latest mesos from mesosphere, rather than breerly.
-
-####Bugs
-- Fix a race condition in multiprocessing code when Relay initializes
+- Adds a timeout that terminates relay.mesos if mesos scheduler fails to start
 
 
 2.0 (2015-07-26)
