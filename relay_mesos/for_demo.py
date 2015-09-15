@@ -28,3 +28,19 @@ def target_value():
     """
     while True:
         yield 40  # you could have any arbitrary logic you wish here...
+
+
+def stop_if_inactive(errdata):
+    """An example optional stop condition that will cause relay.mesos to quit
+    if the difference between the target and metric does not change for
+    N samples in a row"""
+    N = 20
+
+    if len(errdata) >= N and all(abs(x) < 1 for x in errdata[-N:]):
+        log.warn(
+            "relay.mesos exiting because there was no difference between"
+            " metric and target for last %s samples." % N)
+        # possibly an issue with your mesos environment, possibly a false alarm
+        return 0
+    # assume healthy
+    return -1

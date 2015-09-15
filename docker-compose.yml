@@ -81,11 +81,12 @@ relay:
     # RELAY_TARGET: "relay_mesos.for_demo.target_value"
     RELAY_TARGET: "oscillating_setpoint"
     RELAY_SENDSTATS: "tcp://web:5673"
+    # RELAY_STOP_CONDITION: "relay_mesos.for_demo.stop_if_inactive"
     RELAY_MESOS_FRAMEWORK_NAME: "Demo Framework"
     RELAY_MESOS_TASK_RESOURCES: "cpus=0.1 mem=1"
     RELAY_MESOS_MASTER: "zk://zookeeper:2181/mesos"
     RELAY_MESOS_MAX_FAILURES: "10"
-    RELAY_DELAY: "0.1"
+    RELAY_DELAY: "0.2"
     RELAY_MESOS_MASTER_STATE_FOR_DEMO: "http://master:5050/master/state.json"
     RELAY_MESOS_VOLUMES: "/tmp/:/mounted_testfile:ro"
     RELAY_MESOS_CHECKPOINT: true

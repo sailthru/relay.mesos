@@ -32,7 +32,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'relay.runner==0.1.8', 'mesos.cli', 'mesos.interface>=0.22.0'],
+        'relay.runner==0.1.9', 'mesos.cli', 'mesos.interface>=0.22.0'],
 
     extras_require={
         'mesos': ['mesos.native'],

@@ -217,3 +217,6 @@ Relay.Mesos options are prefixed with `RELAY_MESOS`.  For instance:
 Relay-only options (ie those that start with "RELAY_"):
 
     RELAY_DELAY=60
+
+You can see an example list of configured environment variables in the
+file, `docker-compose.yml`.
