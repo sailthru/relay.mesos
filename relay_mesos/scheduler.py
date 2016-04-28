@@ -86,6 +86,7 @@ def _offer_has_valid_attributes(offer, mesos_attributes):
 
     return True
 
+
 def _calc_tasks_per_offer(offer, task_resources):
     """
     Decide how many tasks a given mesos Offer can contain.
@@ -370,7 +371,6 @@ class Scheduler(mesos.interface.Scheduler):
             MV=abs(MV), available_offers=available_offers,
             driver=driver, command=command, ns=self.ns
         )
-        #driver.reviveOffers()
 
     def _get_and_update_relay(self, available_offers):
         """
@@ -399,12 +399,9 @@ class Scheduler(mesos.interface.Scheduler):
                     command = self.ns.warmer
                 elif MV < 0 and self.ns.cooler:
                     command = self.ns.cooler
-                if abs(MV) < len(available_offers):
-                    self.MV[:] = [0, time.time()]
-                else:
-                    new_MV = MV - (MV > 0 or -1) * max(abs(MV),
-                                                       len(available_offers))
-                    self.MV[:] = [new_MV, time.time()]
+                new_MV = MV - (MV > 0 or -1) * min(abs(MV),
+                                                   len(available_offers))
+                self.MV[:] = [new_MV, time.time()]
         return (MV, command)
 
     def statusUpdate(self, driver, update):
