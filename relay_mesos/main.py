@@ -1,5 +1,6 @@
 import atexit
 import multiprocessing as mp
+import threading
 import json
 import signal
 import sys
@@ -10,6 +11,7 @@ from relay.runner import main as relay_main, build_arg_parser as relay_ap
 from relay_mesos import log
 from relay_mesos.util import catch
 from relay_mesos.scheduler import Scheduler
+from mesos.interface import mesos_pb2
 
 
 class TimeoutError(Exception):
@@ -43,23 +45,14 @@ def warmer_cooler_wrapper(MV, ns):
     return _warmer_cooler_wrapper
 
 
-def set_signals(mesos, relay, ns):
+def set_signals(relay, ns):
     """Kill child processes on sigint or sigterm"""
     def kill_children(signal, frame):
         log.error(
             'Received a signal that is trying to terminate this process.'
-            ' Terminating mesos and relay child processes!', extra=dict(
+            ' Terminating relay child process!', extra=dict(
                 mesos_framework_name=ns.mesos_framework_name,
                 signal=signal))
-        try:
-            mesos.terminate()
-            log.info(
-                'terminated mesos scheduler',
-                extra=dict(mesos_framework_name=ns.mesos_framework_name))
-        except:
-            log.exception(
-                'could not terminate mesos scheduler',
-                extra=dict(mesos_framework_name=ns.mesos_framework_name))
         try:
             relay.terminate()
             log.info(
@@ -111,7 +104,7 @@ def main(ns):
     # store exceptions that may be raised
     exception_receiver, exception_sender = mp.Pipe(False)
     # notify relay when mesos framework is ready
-    mesos_ready = mp.Event()
+    mesos_ready = threading.Event()
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
@@ -120,20 +113,28 @@ def main(ns):
     if ns.cooler:
         ns_relay.cooler = warmer_cooler_wrapper(MV, ns)
 
+    mesos_scheduler, mesos_driver = init_mesos_driver(ns=ns,
+                                     MV=MV,
+                                     exception_sender=exception_sender,
+                                     mesos_ready=mesos_ready)
     mesos_name = "Relay.Mesos Scheduler"
-    mesos = mp.Process(
+    mesos = threading.Thread(
         target=catch(init_mesos_scheduler, exception_sender),
-        kwargs=dict(ns=ns, MV=MV, exception_sender=exception_sender,
-                    mesos_ready=mesos_ready),
+        kwargs=dict(driver=mesos_driver),
         name=mesos_name)
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
         target=catch(init_relay, exception_sender),
         args=(ns_relay, mesos_ready, ns.mesos_framework_name),
         name=relay_name)
+    mesos.daemon = True
     mesos.start()  # start mesos framework
+
+    mesos_ready.wait(ns_relay.init_timeout)
+    if not mesos_ready.is_set():
+        raise TimeoutError("Mesos Scheduler took too long to come up!")
     relay.start()  # start relay's loop
-    set_signals(mesos, relay, ns)
+    set_signals(relay, ns)
 
     while True:
         if exception_receiver.poll():
@@ -156,6 +157,13 @@ def main(ns):
                 "  This may be a code bug.  Check logs.",
                 extra=dict(mesos_framework_name=ns.mesos_framework_name))
             break
+        num_jobs = MV[0]
+        if num_jobs != 0:
+            log.debug("Number of jobs to run %d non-zero, reviving offers" % num_jobs)
+            mesos_scheduler.revive_offers()
+        else:
+            log.debug("No work to perform")
+
         # save cpu cycles by checking for subprocess failures less often
         if ns.delay > 5:
             time.sleep(5)
@@ -163,7 +171,6 @@ def main(ns):
             time.sleep(ns.delay)
 
     relay.terminate()
-    mesos.terminate()
     sys.exit(1)
 
 
@@ -181,9 +188,7 @@ def init_relay(ns_relay, mesos_ready, mesos_framework_name):
     relay_main(ns_relay)
 
 
-def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
-    import mesos.interface
-    from mesos.interface import mesos_pb2
+def init_mesos_driver(ns, MV, exception_sender, mesos_ready):
     try:
         import mesos.native
     except ImportError:
@@ -210,15 +215,18 @@ def init_mesos_scheduler(ns, MV, exception_sender, mesos_ready):
 
     # build driver
     log.debug("Instantiating MesosSchedulerDriver")
+    scheduler = Scheduler(MV=MV,
+        exception_sender=exception_sender, mesos_ready=mesos_ready,
+        ns=ns)
     driver = mesos.native.MesosSchedulerDriver(
-        Scheduler(
-            MV=MV, exception_sender=exception_sender, mesos_ready=mesos_ready,
-            ns=ns),
+        scheduler,
         framework,
         ns.mesos_master)
     atexit.register(driver.stop)
+    return scheduler, driver
 
-    # run things
+
+def init_mesos_scheduler(driver):
     log.debug("Running the instance of MesosSchedulerDriver")
     status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
     driver.stop()  # Ensure that the driver process terminates.

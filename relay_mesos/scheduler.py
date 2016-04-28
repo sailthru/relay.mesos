@@ -278,6 +278,14 @@ class Scheduler(mesos.interface.Scheduler):
         self.mesos_ready = mesos_ready
         self.exception_sender = exception_sender
         self.failures = 0
+        self.driver = None
+
+    def revive_offers(self):
+        if self.driver:
+            log.debug('Reviving offers')
+            self.driver.reviveOffers()
+        else:
+            log.warn('driver not set, this may be a code bug!')
 
     def registered(self, driver, frameworkId, masterInfo):
         """
@@ -292,6 +300,7 @@ class Scheduler(mesos.interface.Scheduler):
             driver, frameworkId, masterInfo)
 
     def _registered(self, driver, frameworkId, masterInfo):
+        self.driver = driver
         self.mesos_ready.set()
 
         log.info(
@@ -354,12 +363,14 @@ class Scheduler(mesos.interface.Scheduler):
         if command is None:
             for offer, _ in available_offers:
                 driver.declineOffer(offer.id)
+            log.debug('Queue is empty, supressing offers')
+            driver.suppressOffers()
             return
         create_tasks(
             MV=abs(MV), available_offers=available_offers,
             driver=driver, command=command, ns=self.ns
         )
-        driver.reviveOffers()
+        #driver.reviveOffers()
 
     def _get_and_update_relay(self, available_offers):
         """
