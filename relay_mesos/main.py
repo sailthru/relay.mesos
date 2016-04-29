@@ -18,7 +18,7 @@ class TimeoutError(Exception):
     pass
 
 
-def warmer_cooler_wrapper(MV, ns, relay_ready):
+def warmer_cooler_wrapper(MV, ns):
     """
     Act as a warmer or cooler function such that, instead of executing code,
     we ask mesos to execute it.
@@ -33,8 +33,6 @@ def warmer_cooler_wrapper(MV, ns, relay_ready):
             extra=dict(
                 mesos_framework_name=ns.mesos_framework_name,
                 task_num=n, task_type="warmer" if n > 0 else "cooler"))
-        if not relay_ready.is_set():
-            relay_ready.set()
         t = time.time()
         with MV.get_lock():
             if MV[1] < t:
@@ -112,9 +110,9 @@ def main(ns):
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
     if ns.warmer:
-        ns_relay.warmer = warmer_cooler_wrapper(MV, ns, relay_ready)
+        ns_relay.warmer = warmer_cooler_wrapper(MV, ns)
     if ns.cooler:
-        ns_relay.cooler = warmer_cooler_wrapper(MV, ns, relay_ready)
+        ns_relay.cooler = warmer_cooler_wrapper(MV, ns)
 
     mesos_scheduler, mesos_driver = init_mesos_driver(ns=ns,
                                      MV=MV,
@@ -128,7 +126,7 @@ def main(ns):
     relay_name = "Relay.Runner Event Loop"
     relay = mp.Process(
         target=catch(init_relay, exception_sender),
-        args=(ns_relay, mesos_ready, ns.mesos_framework_name),
+        args=(ns_relay, relay_ready, ns.mesos_framework_name),
         name=relay_name)
     mesos.daemon = True
     mesos.start()  # start mesos framework
@@ -182,17 +180,11 @@ def main(ns):
     sys.exit(1)
 
 
-def init_relay(ns_relay, mesos_ready, mesos_framework_name):
+def init_relay(ns_relay, relay_ready, mesos_framework_name):
     log.debug(
-        'Relay waiting to start until mesos framework is registered',
-        extra=dict(mesos_framework_name=mesos_framework_name,
-                   timeout=ns_relay.init_timeout))
-    mesos_ready.wait(ns_relay.init_timeout)
-    if not mesos_ready.is_set():
-        raise TimeoutError("Mesos Scheduler took too long to come up!")
-    log.debug(
-        'Relay notified that mesos framework is registered',
+        'Getting ready to start relay process',
         extra=dict(mesos_framework_name=mesos_framework_name))
+    relay_ready.set()
     relay_main(ns_relay)
 
 
