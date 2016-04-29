@@ -18,7 +18,7 @@ class TimeoutError(Exception):
     pass
 
 
-def warmer_cooler_wrapper(MV, ns):
+def warmer_cooler_wrapper(MV, ns, relay_ready):
     """
     Act as a warmer or cooler function such that, instead of executing code,
     we ask mesos to execute it.
@@ -33,6 +33,8 @@ def warmer_cooler_wrapper(MV, ns):
             extra=dict(
                 mesos_framework_name=ns.mesos_framework_name,
                 task_num=n, task_type="warmer" if n > 0 else "cooler"))
+        if not relay_ready.is_set():
+            relay_ready.set()
         t = time.time()
         with MV.get_lock():
             if MV[1] < t:
@@ -105,13 +107,14 @@ def main(ns):
     exception_receiver, exception_sender = mp.Pipe(False)
     # notify relay when mesos framework is ready
     mesos_ready = threading.Event()
+    relay_ready = mp.Event()
 
     # copy and then override warmer and cooler
     ns_relay = ns.__class__(**{k: v for k, v in ns.__dict__.items()})
     if ns.warmer:
-        ns_relay.warmer = warmer_cooler_wrapper(MV, ns)
+        ns_relay.warmer = warmer_cooler_wrapper(MV, ns, relay_ready)
     if ns.cooler:
-        ns_relay.cooler = warmer_cooler_wrapper(MV, ns)
+        ns_relay.cooler = warmer_cooler_wrapper(MV, ns, relay_ready)
 
     mesos_scheduler, mesos_driver = init_mesos_driver(ns=ns,
                                      MV=MV,
@@ -135,6 +138,10 @@ def main(ns):
         raise TimeoutError("Mesos Scheduler took too long to come up!")
     relay.start()  # start relay's loop
     set_signals(relay, ns)
+
+    relay_ready.wait(ns_relay.init_timeout)
+    if not relay_ready.is_set():
+        raise TimeoutError("Relay took too long to come up!")
 
     while True:
         if exception_receiver.poll():
