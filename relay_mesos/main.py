@@ -141,6 +141,7 @@ def main(ns):
 
     relay_ready.wait(ns_relay.init_timeout)
     if not relay_ready.is_set():
+        relay.terminate()
         raise TimeoutError("Relay took too long to come up!")
 
     while True:
