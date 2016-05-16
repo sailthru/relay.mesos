@@ -138,7 +138,6 @@ def main(ns):
             mesos_scheduler.revive_offers()
 
         # save cpu cycles by checking for subprocess failures less often
-        log.debug("Delay is %s" % ns.delay)
         time.sleep(min(5, ns.delay))
 
     relay.terminate()
@@ -240,6 +239,14 @@ build_arg_parser = at.build_arg_parser([
                 " to start up before the Relay scheduler starts.  If timeout"
                 " is exceeded, raise an error and exit."
             )),
+        relay_add_argument(
+            '-d', '--delay', type=float, default=1,
+                    help='num seconds to wait between metric polling. ie. 1/sample_rate'
+            ),
+        relay_add_argument(
+            '-c', '--cooler', type=str,
+                    help='bash command to run'
+            ),
     ),
     at.group(
         "Relay.Mesos -- Mesos-specific parameters",
@@ -318,10 +325,6 @@ build_arg_parser = at.build_arg_parser([
             '--docker_image', help=(
                 "The name of a docker image if you wish to execute the"
                 " warmer and cooler in it")),
-        add_argument(
-            '-d', '--delay', type=float, default=1,
-                    help='num seconds to wait between metric polling. ie. 1/sample_rate'
-                ),
         add_argument(
             '--docker_network', choices=("HOST", "BRIDGE", "NONE"),
             default="BRIDGE", help=(
