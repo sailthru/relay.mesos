@@ -301,6 +301,7 @@ class Scheduler(mesos.interface.Scheduler):
             driver, frameworkId, masterInfo)
 
     def _registered(self, driver, frameworkId, masterInfo):
+        self.framework_id = frameworkId.value
         self.driver = driver
         self.mesos_ready.set()
 

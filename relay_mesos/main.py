@@ -12,6 +12,7 @@ from relay_mesos import log
 from relay_mesos.util import catch
 from relay_mesos.scheduler import Scheduler
 from mesos.interface import mesos_pb2
+import stolos.api
 
 
 class TimeoutError(Exception):
@@ -68,6 +69,18 @@ def main(ns):
         "Starting Relay Mesos!",
         extra={k: str(v) for k, v in ns.__dict__.items()})
 
+    # In order to support failover we need to keep track of the framework_id
+    # of previous instances of this framework. The framework_id is stored using
+    # the stolos queue backend. If it's set, assume we're recovering from a
+    # failover
+    framework_id_path = "relay_mesos.framework.%s" % ns.mesos_framework_name
+    stolos.api.initialize([])
+    qb_client = stolos.api.get_qbclient()
+    existing_id = None
+    if qb_client.exists(framework_id_path):
+        existing_id = qb_client.get(framework_id_path)
+        log.info("Found existing framework_id: %s" % existing_id)
+
     # a distributed value storing the num and type of tasks mesos scheduler
     # should create at any given moment in time.
     # Sign of MV determines task type: warmer or cooler
@@ -86,7 +99,8 @@ def main(ns):
     mesos_scheduler, mesos_driver = init_mesos_driver(ns=ns,
                                      MV=MV,
                                      exception_sender=exception_sender,
-                                     mesos_ready=mesos_ready)
+                                     mesos_ready=mesos_ready,
+                                     framework_id=existing_id)
     mesos_name = "Relay.Mesos Scheduler"
     mesos = threading.Thread(
         target=catch(init_mesos_scheduler, exception_sender),
@@ -110,6 +124,12 @@ def main(ns):
     if not relay_ready.is_set():
         relay.terminate()
         raise TimeoutError("Relay took too long to come up!")
+
+    log.info("Saving framework_id %s" % mesos_scheduler.framework_id)
+    if existing_id:
+        qb_client.set(framework_id_path, mesos_scheduler.framework_id)
+    else:
+        qb_client.create(framework_id_path, mesos_scheduler.framework_id)
 
     while True:
         if exception_receiver.poll():
@@ -140,6 +160,9 @@ def main(ns):
         # save cpu cycles by checking for subprocess failures less often
         time.sleep(min(5, ns.delay))
 
+    # If we've gotten here, assume the framework has been cleanly shutdown and
+    # won't failover
+    qb_client.delete(framework_id_path)
     relay.terminate()
     sys.exit(1)
 
@@ -168,7 +191,7 @@ def init_relay(ns_relay, relay_ready, MV):
 
 
 
-def init_mesos_driver(ns, MV, exception_sender, mesos_ready):
+def init_mesos_driver(ns, MV, exception_sender, mesos_ready, framework_id):
     try:
         import mesos.native
     except ImportError:
@@ -187,7 +210,10 @@ def init_mesos_driver(ns, MV, exception_sender, mesos_ready):
         checkpoint=ns.mesos_checkpoint,
         user="",  # Have Mesos fill in the current user.
         name="Relay.Mesos: %s" % ns.mesos_framework_name,
+        failover_timeout=ns.failover_timeout
     )
+    if framework_id:
+        framework.id.value = framework_id
     if ns.mesos_framework_principal:
         framework.principal = ns.mesos_framework_principal
     if ns.mesos_framework_role:
@@ -246,6 +272,12 @@ build_arg_parser = at.build_arg_parser([
         relay_add_argument(
             '-c', '--cooler', type=str,
                     help='bash command to run'
+            ),
+        relay_add_argument(
+            '--failover_timeout', type=int, default=60*60*4,
+                    help=("Number of seconds the master will wait before"
+                          " killing the tasks of a failed scheduler."
+                          " The default value is 4 hours")
             ),
     ),
     at.group(
