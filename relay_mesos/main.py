@@ -116,6 +116,7 @@ def main(ns):
 
     mesos_ready.wait(ns_relay.init_timeout)
     if not mesos_ready.is_set():
+        qb_client.delete(framework_id_path)
         raise TimeoutError("Mesos Scheduler took too long to come up!")
     relay.start()  # start relay's loop
     set_signals(relay, ns)
