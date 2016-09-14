@@ -188,7 +188,7 @@ def init_relay(ns_relay, relay_ready, MV):
         with MV.get_lock():
             if MV[1] < t:
                 MV[:] = (-qsize, t)
-        time.sleep(min(5, ns_relay.delay))
+        time.sleep(ns_relay.delay)
 
 
 
