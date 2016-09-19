@@ -102,17 +102,12 @@ def _calc_tasks_per_offer(offer, task_resources):
         }
     """
     num_tasks = float('inf')
+    offer_resources = {}
     for res in offer.resources:
         if res.name not in task_resources:
             continue  # we don't care about this resource
         if res.name in SCALAR_KEYS:
-            oval = float(res.scalar.value)
-            reqval = float(task_resources.get(res.name))
-            if reqval <= oval:
-                num_tasks = min(num_tasks, int(oval / reqval))
-            else:
-                num_tasks = 0
-                break
+            offer_resources[res.name] = float(res.scalar.value)
         elif res.name in RANGE_KEYS:
             raise NotImplementedError("TODO ... Implement support for this")
             # what does reqval look like?
@@ -128,6 +123,15 @@ def _calc_tasks_per_offer(offer, task_resources):
             raise NotImplementedError((
                 "Unrecognized mesos resource: %s.  You should figure out how"
                 " to support this") % res.name)
+    for resource, reqval in task_resources.iteritems():
+        reqval = float(reqval)
+        oval = offer_resources.get(resource, 0)
+        if reqval <= oval:
+            num_tasks = min(num_tasks, int(oval / reqval))
+        else:
+            num_tasks = 0
+            break
+
     if num_tasks == float('inf'):
         return 0
     else:
